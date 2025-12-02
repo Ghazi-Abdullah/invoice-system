@@ -13,12 +13,19 @@ class InvoiceController extends Controller
     public function index(Request $request)
     {
         try {
-            Log::info('Fetching invoices for user: ' . $request->user()->id, [
-                'filters' => $request->all()
+            $userId = $request->user()->id;
+
+            Log::info('🧾 جلب الفواتير للمستخدم:', [
+                'user_id' => $userId,
+                'email' => $request->user()->email
             ]);
 
-            $query = Invoice::where('user_id', $request->user()->id)
-                ->with(['client', 'items']);
+            // استعلام لجميع الفواتير الخاصة بالمستخدم الحالي بالإضافة إلى الفواتير الافتراضية
+            $query = Invoice::where(function($q) use ($userId) {
+                $q->where('user_id', $userId);
+                 // ->orWhere('user_id', 1); // الفواتير الافتراضية
+            })
+            ->with(['client', 'items']);
 
             // تطبيق الفلاتر
             if ($request->has('status') && $request->status !== '') {
@@ -44,9 +51,13 @@ class InvoiceController extends Controller
                 $this->applyDateFilter($query, $request->date);
             }
 
-            $invoices = $query->latest()->paginate(10);
+            $invoices = $query->latest()->paginate(20);
 
-            Log::info('Successfully fetched ' . $invoices->count() . ' invoices');
+            Log::info('📊 نتيجة جلب الفواتير:', [
+                'total_invoices' => $invoices->total(),
+                'current_count' => $invoices->count(),
+                'user_id' => $userId
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -54,14 +65,14 @@ class InvoiceController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Error fetching invoices: ' . $e->getMessage(), [
+            Log::error('❌ خطأ في جلب الفواتير: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'user_id' => $request->user()->id
+                'user_id' => $request->user()->id ?? 'غير معروف'
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch invoices: ' . $e->getMessage()
+                'message' => 'فشل في جلب الفواتير: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -69,7 +80,8 @@ class InvoiceController extends Controller
     public function store(Request $request)
     {
         try {
-            Log::info('Creating invoice for user: ' . $request->user()->id, [
+            Log::info('🔄 إنشاء فاتورة جديدة:', [
+                'user_id' => $request->user()->id,
                 'data' => $request->all()
             ]);
 
@@ -87,7 +99,7 @@ class InvoiceController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validation failed',
+                    'message' => 'فشل في التحقق من البيانات',
                     'errors' => $validator->errors()
                 ], 422);
             }
@@ -130,23 +142,27 @@ class InvoiceController extends Controller
             // تحميل العلاقات
             $invoice->load(['client', 'items']);
 
-            Log::info('Invoice created successfully: ' . $invoice->id);
+            Log::info('✅ تم إنشاء فاتورة جديدة:', [
+                'id' => $invoice->id,
+                'invoice_number' => $invoice->invoice_number,
+                'user_id' => $invoice->user_id
+            ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Invoice created successfully',
+                'message' => 'تم إنشاء الفاتورة بنجاح',
                 'data' => $invoice
             ], 201);
 
         } catch (\Exception $e) {
-            Log::error('Error creating invoice: ' . $e->getMessage(), [
+            Log::error('❌ خطأ في إنشاء الفاتورة: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'user_id' => $request->user()->id
+                'user_id' => $request->user()->id ?? 'غير معروف'
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create invoice: ' . $e->getMessage()
+                'message' => 'فشل في إنشاء الفاتورة: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -154,6 +170,19 @@ class InvoiceController extends Controller
     public function show(Invoice $invoice)
     {
         try {
+            // التحقق من أن الفاتورة تخص المستخدم الحالي أو هي فاتورة افتراضية
+            if (request()->user()->id !== $invoice->user_id && $invoice->user_id !== 1) {
+                Log::warning('⚠️ محاولة وصول غير مصرح للفاتورة:', [
+                    'invoice_user_id' => $invoice->user_id,
+                    'current_user_id' => request()->user()->id
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'غير مصرح بالوصول لهذه الفاتورة'
+                ], 403);
+            }
+
             $invoice->load(['client', 'items', 'user']);
 
             return response()->json([
@@ -162,14 +191,14 @@ class InvoiceController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Error fetching invoice: ' . $e->getMessage(), [
+            Log::error('❌ خطأ في جلب الفاتورة: ' . $e->getMessage(), [
                 'invoice_id' => $invoice->id,
                 'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch invoice: ' . $e->getMessage()
+                'message' => 'فشل في جلب الفاتورة: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -177,6 +206,14 @@ class InvoiceController extends Controller
     public function update(Request $request, Invoice $invoice)
     {
         try {
+            // التحقق من أن الفاتورة تخص المستخدم الحالي (وليست افتراضية)
+            if ($request->user()->id !== $invoice->user_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'غير مصرح بتحديث هذه الفاتورة'
+                ], 403);
+            }
+
             $validator = Validator::make($request->all(), [
                 'issue_date' => 'required|date',
                 'due_date' => 'required|date|after:issue_date',
@@ -190,7 +227,7 @@ class InvoiceController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validation failed',
+                    'message' => 'فشل في التحقق من البيانات',
                     'errors' => $validator->errors()
                 ], 422);
             }
@@ -228,21 +265,26 @@ class InvoiceController extends Controller
 
             $invoice->load(['client', 'items', 'user']);
 
+            Log::info('✏️ تم تحديث الفاتورة:', [
+                'id' => $invoice->id,
+                'invoice_number' => $invoice->invoice_number
+            ]);
+
             return response()->json([
                 'success' => true,
-                'message' => 'Invoice updated successfully',
+                'message' => 'تم تحديث الفاتورة بنجاح',
                 'data' => $invoice
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Error updating invoice: ' . $e->getMessage(), [
+            Log::error('❌ خطأ في تحديث الفاتورة: ' . $e->getMessage(), [
                 'invoice_id' => $invoice->id,
                 'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update invoice: ' . $e->getMessage()
+                'message' => 'فشل في تحديث الفاتورة: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -250,22 +292,35 @@ class InvoiceController extends Controller
     public function destroy(Invoice $invoice)
     {
         try {
+            // التحقق من أن الفاتورة تخص المستخدم الحالي
+            if (request()->user()->id !== $invoice->user_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'غير مصرح بحذف هذه الفاتورة'
+                ], 403);
+            }
+
             $invoice->delete();
+
+            Log::info('🗑️ تم حذف الفاتورة:', [
+                'id' => $invoice->id,
+                'invoice_number' => $invoice->invoice_number
+            ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Invoice deleted successfully'
+                'message' => 'تم حذف الفاتورة بنجاح'
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Error deleting invoice: ' . $e->getMessage(), [
+            Log::error('❌ خطأ في حذف الفاتورة: ' . $e->getMessage(), [
                 'invoice_id' => $invoice->id,
                 'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete invoice: ' . $e->getMessage()
+                'message' => 'فشل في حذف الفاتورة: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -273,6 +328,14 @@ class InvoiceController extends Controller
     public function updateStatus(Request $request, Invoice $invoice)
     {
         try {
+            // التحقق من أن الفاتورة تخص المستخدم الحالي
+            if ($request->user()->id !== $invoice->user_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'غير مصرح بتحديث حالة هذه الفاتورة'
+                ], 403);
+            }
+
             $validator = Validator::make($request->all(), [
                 'status' => 'required|in:draft,sent,paid,overdue'
             ]);
@@ -280,7 +343,7 @@ class InvoiceController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validation failed',
+                    'message' => 'فشل في التحقق من البيانات',
                     'errors' => $validator->errors()
                 ], 422);
             }
@@ -289,21 +352,26 @@ class InvoiceController extends Controller
 
             $invoice->load(['client', 'items', 'user']);
 
+            Log::info('🔄 تم تحديث حالة الفاتورة:', [
+                'id' => $invoice->id,
+                'status' => $invoice->status
+            ]);
+
             return response()->json([
                 'success' => true,
                 'data' => $invoice,
-                'message' => 'Invoice status updated successfully'
+                'message' => 'تم تحديث حالة الفاتورة بنجاح'
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Error updating invoice status: ' . $e->getMessage(), [
+            Log::error('❌ خطأ في تحديث حالة الفاتورة: ' . $e->getMessage(), [
                 'invoice_id' => $invoice->id,
                 'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update invoice status: ' . $e->getMessage()
+                'message' => 'فشل في تحديث حالة الفاتورة: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -334,6 +402,55 @@ class InvoiceController extends Controller
             case 'last_year':
                 $query->whereYear('issue_date', $now->subYear()->year);
                 break;
+        }
+    }
+
+    /**
+     * دالة لربط الفواتير الافتراضية بالمستخدم الحالي
+     */
+    public function linkDefaultInvoices(Request $request)
+    {
+        try {
+            $userId = $request->user()->id;
+            $defaultInvoices = Invoice::where('user_id', 1)->get();
+
+            $linkedCount = 0;
+
+            foreach ($defaultInvoices as $invoice) {
+                // نسخ الفاتورة الافتراضية للمستخدم الحالي
+                $newInvoice = $invoice->replicate();
+                $newInvoice->user_id = $userId;
+                $newInvoice->invoice_number = 'INV-' . date('Ymd') . '-' . strtoupper(uniqid());
+                $newInvoice->save();
+
+                // نسخ العناصر
+                foreach ($invoice->items as $item) {
+                    $newItem = $item->replicate();
+                    $newItem->invoice_id = $newInvoice->id;
+                    $newItem->save();
+                }
+
+                $linkedCount++;
+            }
+
+            Log::info('✅ تم ربط الفواتير الافتراضية:', [
+                'user_id' => $userId,
+                'count' => $linkedCount
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم ربط ' . $linkedCount . ' فاتورة افتراضية بحسابك',
+                'count' => $linkedCount
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('❌ خطأ في ربط الفواتير الافتراضية: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل في ربط الفواتير الافتراضية'
+            ], 500);
         }
     }
 }
