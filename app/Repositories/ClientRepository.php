@@ -1,32 +1,26 @@
 <?php
-// app/Repositories/ClientRepository.php
+
 namespace App\Repositories;
 
-use App\Contracts\ClientRepositoryInterface;
 use App\Models\Client;
+use App\Repositories\BaseRepository;
 
-class ClientRepository extends BaseRepository implements ClientRepositoryInterface
+class ClientRepository extends BaseRepository
 {
-    public function __construct(Client $model)
+    public function __construct()
     {
-        parent::__construct($model);
+        parent::__construct(new Client());
     }
 
-    public function getUserClients(int $userId)
+    public function search($searchTerm, $userId)
     {
-        return $this->model->where('user_id', $userId)
-            ->latest()
-            ->paginate(15);
-    }
-
-    public function searchClients(int $userId, string $search)
-    {
-        return $this->model->where('user_id', $userId)
-            ->where(function ($query) use ($search) {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('company_name', 'like', "%{$search}%");
+        return $this->model
+            ->where('user_id', $userId)
+            ->where(function ($query) use ($searchTerm) {
+                $query->where('name', 'like', '%' . $searchTerm . '%')
+                      ->orWhere('email', 'like', '%' . $searchTerm . '%')
+                      ->orWhere('company_name', 'like', '%' . $searchTerm . '%');
             })
-            ->get();
+            ->get(['id', 'name', 'email', 'company_name', 'phone']);
     }
 }

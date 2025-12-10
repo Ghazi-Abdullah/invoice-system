@@ -1,15 +1,17 @@
 <?php
-// app/Providers/RepositoryServiceProvider.php
+
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use App\Contracts\ClientRepositoryInterface;
 use App\Contracts\InvoiceRepositoryInterface;
 use App\Contracts\UserRepositoryInterface;
-use App\Repositories\Admin\InvoiceSummary\InvoiceSummaryInterface;
+
 use App\Repositories\ClientRepository;
 use App\Repositories\InvoiceRepository;
 use App\Repositories\UserRepository;
+
+use App\Repositories\Admin\InvoiceSummary\InvoiceSummaryInterface;
 use App\Repositories\Admin\InvoiceSummary\InvoiceSummaryRepository;
 
 class RepositoryServiceProvider extends ServiceProvider
@@ -20,7 +22,12 @@ class RepositoryServiceProvider extends ServiceProvider
         $this->app->bind(InvoiceRepositoryInterface::class, InvoiceRepository::class);
         $this->app->bind(UserRepositoryInterface::class, UserRepository::class);
 
-        // إضافة الربط للـ InvoiceSummary
+        // FIX: Correct binding for InvoiceSummary
         $this->app->bind(InvoiceSummaryInterface::class, InvoiceSummaryRepository::class);
+    }
+
+    public function boot()
+    {
+        //
     }
 }

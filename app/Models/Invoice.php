@@ -12,14 +12,14 @@ class Invoice extends Model
     protected $fillable = [
         'invoice_number',
         'client_id',
+        'user_id',
         'issue_date',
         'due_date',
-        'total_amount',
-        'tax_amount',
         'subtotal',
+        'tax_amount',
+        'total_amount',
         'status',
-        'notes',
-        'user_id'
+        'notes'
     ];
 
     protected $casts = [
@@ -30,14 +30,14 @@ class Invoice extends Model
         'total_amount' => 'decimal:2',
     ];
 
-    public function client()
-    {
-        return $this->belongsTo(Client::class);
-    }
-
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function client()
+    {
+        return $this->belongsTo(Client::class);
     }
 
     public function items()
