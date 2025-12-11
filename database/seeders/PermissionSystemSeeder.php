@@ -15,7 +15,7 @@ class PermissionSystemSeeder extends Seeder
 
         // مسح الجداول
         DB::table('admin_group_permissions')->truncate();
-        DB::table('permissions')->truncate();
+        DB::table('admin_permissions')->truncate();
         DB::table('admin_sub_menus')->truncate();
         DB::table('admin_menus')->truncate();
         DB::table('users')->truncate();
@@ -43,18 +43,11 @@ class PermissionSystemSeeder extends Seeder
 
         // 3. إضافة القوائم الفرعية
         DB::table('admin_sub_menus')->insert([
-            // Clients Submenus
             ['id' => 1, 'admin_menu_id' => 2, 'title_en' => 'All Clients', 'title_ar' => 'جميع العملاء', 'link' => '/clients', 'sort_order' => 1],
             ['id' => 2, 'admin_menu_id' => 2, 'title_en' => 'Add Client', 'title_ar' => 'إضافة عميل', 'link' => '/clients/create', 'sort_order' => 2],
-
-            // Invoices Submenus
             ['id' => 3, 'admin_menu_id' => 3, 'title_en' => 'All Invoices', 'title_ar' => 'جميع الفواتير', 'link' => '/invoices', 'sort_order' => 1],
             ['id' => 4, 'admin_menu_id' => 3, 'title_en' => 'Create Invoice', 'title_ar' => 'إنشاء فاتورة', 'link' => '/invoices/create', 'sort_order' => 2],
-
-            // Reports Submenus
             ['id' => 5, 'admin_menu_id' => 4, 'title_en' => 'Sales Report', 'title_ar' => 'تقرير المبيعات', 'link' => '/reports/sales', 'sort_order' => 1],
-
-            // Administration Submenus
             ['id' => 6, 'admin_menu_id' => 5, 'title_en' => 'User Groups', 'title_ar' => 'مجموعات المستخدمين', 'link' => '/admin/groups', 'sort_order' => 1],
             ['id' => 7, 'admin_menu_id' => 5, 'title_en' => 'Users', 'title_ar' => 'المستخدمون', 'link' => '/admin/users', 'sort_order' => 2],
             ['id' => 8, 'admin_menu_id' => 5, 'title_en' => 'Permissions', 'title_ar' => 'الصلاحيات', 'link' => '/admin/permissions', 'sort_order' => 3],
@@ -62,17 +55,12 @@ class PermissionSystemSeeder extends Seeder
 
         // 4. إضافة الصلاحيات
         $permissions = [
-            // Dashboard Permission
             ['id' => 1, 'admin_menu_id' => 1, 'admin_sub_menu_id' => null, 'parent_id' => 0, 'title' => 'dashboard', 'description_en' => 'View Dashboard', 'description_ar' => 'عرض لوحة التحكم', 'is_parent' => true],
-
-            // Clients Permissions
             ['id' => 2, 'admin_menu_id' => 2, 'admin_sub_menu_id' => 1, 'parent_id' => 0, 'title' => 'clients', 'description_en' => 'View Clients', 'description_ar' => 'عرض العملاء', 'is_parent' => true],
             ['id' => 3, 'admin_menu_id' => 2, 'admin_sub_menu_id' => 1, 'parent_id' => 2, 'title' => 'view_clients', 'description_en' => 'View All Clients', 'description_ar' => 'عرض جميع العملاء', 'is_parent' => false],
             ['id' => 4, 'admin_menu_id' => 2, 'admin_sub_menu_id' => 2, 'parent_id' => 2, 'title' => 'create_client', 'description_en' => 'Create Client', 'description_ar' => 'إنشاء عميل', 'is_parent' => false],
             ['id' => 5, 'admin_menu_id' => 2, 'admin_sub_menu_id' => 1, 'parent_id' => 2, 'title' => 'edit_client', 'description_en' => 'Edit Client', 'description_ar' => 'تعديل عميل', 'is_parent' => false],
             ['id' => 6, 'admin_menu_id' => 2, 'admin_sub_menu_id' => 1, 'parent_id' => 2, 'title' => 'delete_client', 'description_en' => 'Delete Client', 'description_ar' => 'حذف عميل', 'is_parent' => false],
-
-            // Invoices Permissions
             ['id' => 7, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 3, 'parent_id' => 0, 'title' => 'invoices', 'description_en' => 'View Invoices', 'description_ar' => 'عرض الفواتير', 'is_parent' => true],
             ['id' => 8, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 3, 'parent_id' => 7, 'title' => 'view_invoices', 'description_en' => 'View All Invoices', 'description_ar' => 'عرض جميع الفواتير', 'is_parent' => false],
             ['id' => 9, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 4, 'parent_id' => 7, 'title' => 'create_invoice', 'description_en' => 'Create Invoice', 'description_ar' => 'إنشاء فاتورة', 'is_parent' => false],
@@ -80,13 +68,9 @@ class PermissionSystemSeeder extends Seeder
             ['id' => 11, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 3, 'parent_id' => 7, 'title' => 'delete_invoice', 'description_en' => 'Delete Invoice', 'description_ar' => 'حذف فاتورة', 'is_parent' => false],
             ['id' => 12, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 3, 'parent_id' => 7, 'title' => 'view_invoice_details', 'description_en' => 'View Invoice Details', 'description_ar' => 'عرض تفاصيل الفاتورة', 'is_parent' => false],
             ['id' => 13, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 3, 'parent_id' => 7, 'title' => 'print_invoice', 'description_en' => 'Print Invoice', 'description_ar' => 'طباعة الفاتورة', 'is_parent' => false],
-
-            // Reports Permissions
             ['id' => 14, 'admin_menu_id' => 4, 'admin_sub_menu_id' => 5, 'parent_id' => 0, 'title' => 'reports', 'description_en' => 'View Reports', 'description_ar' => 'عرض التقارير', 'is_parent' => true],
             ['id' => 15, 'admin_menu_id' => 4, 'admin_sub_menu_id' => 5, 'parent_id' => 14, 'title' => 'view_sales_report', 'description_en' => 'View Sales Report', 'description_ar' => 'عرض تقرير المبيعات', 'is_parent' => false],
             ['id' => 16, 'admin_menu_id' => 4, 'admin_sub_menu_id' => 5, 'parent_id' => 14, 'title' => 'export_reports', 'description_en' => 'Export Reports', 'description_ar' => 'تصدير التقارير', 'is_parent' => false],
-
-            // Administration Permissions
             ['id' => 17, 'admin_menu_id' => 5, 'admin_sub_menu_id' => 6, 'parent_id' => 0, 'title' => 'administration', 'description_en' => 'Administration Access', 'description_ar' => 'الوصول للإدارة', 'is_parent' => true],
             ['id' => 18, 'admin_menu_id' => 5, 'admin_sub_menu_id' => 6, 'parent_id' => 17, 'title' => 'manage_user_groups', 'description_en' => 'Manage User Groups', 'description_ar' => 'إدارة مجموعات المستخدمين', 'is_parent' => false],
             ['id' => 19, 'admin_menu_id' => 5, 'admin_sub_menu_id' => 7, 'parent_id' => 17, 'title' => 'manage_users', 'description_en' => 'Manage Users', 'description_ar' => 'إدارة المستخدمين', 'is_parent' => false],
@@ -94,7 +78,7 @@ class PermissionSystemSeeder extends Seeder
         ];
 
         foreach ($permissions as $permission) {
-            DB::table('permissions')->insert($permission);
+            DB::table('admin_permissions')->insert($permission);
         }
 
         // 5. إضافة المستخدمين
@@ -113,7 +97,7 @@ class PermissionSystemSeeder extends Seeder
         for ($i = 1; $i <= 20; $i++) {
             DB::table('admin_group_permissions')->insert([
                 'admin_group_id' => 1,
-                'permission_id' => $i
+                'admin_permission_id' => $i
             ]);
         }
 
@@ -122,7 +106,7 @@ class PermissionSystemSeeder extends Seeder
         foreach ($accountantPermissions as $permissionId) {
             DB::table('admin_group_permissions')->insert([
                 'admin_group_id' => 2,
-                'permission_id' => $permissionId
+                'admin_permission_id' => $permissionId
             ]);
         }
 
@@ -131,7 +115,7 @@ class PermissionSystemSeeder extends Seeder
         foreach ($salesPermissions as $permissionId) {
             DB::table('admin_group_permissions')->insert([
                 'admin_group_id' => 3,
-                'permission_id' => $permissionId
+                'admin_permission_id' => $permissionId
             ]);
         }
     }
