@@ -15,6 +15,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'admin_group_id',
+        'is_active'
     ];
 
     protected $hidden = [
@@ -24,80 +26,62 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',
+        'is_active' => 'boolean'
     ];
 
-    public function invoices()
+    public function group()
     {
-        return $this->hasMany(Invoice::class);
+        return $this->belongsTo(AdminGroup::class, 'admin_group_id');
     }
 
-    public function clients()
+    public function hasPermission($permissionTitle)
     {
-        return $this->hasMany(Client::class);
+        if (!$this->group) {
+            return false;
+        }
+
+        return $this->group->permissions()->where('title', $permissionTitle)->exists();
     }
 
-    public function roles()
+    public function getPermissionsAttribute()
     {
-        return $this->belongsToMany(Role::class, 'user_roles');
+        if (!$this->group) {
+            return [];
+        }
+
+        return $this->group->permissions->pluck('title')->toArray();
     }
 
-    public function hasRole($roleName)
+    public function getMenusAttribute()
     {
-        return $this->roles()->where('name', $roleName)->exists();
-    }
+        if (!$this->group) {
+            return [];
+        }
 
-    public function hasAnyRole($roles)
-    {
-        return $this->roles()->whereIn('name', $roles)->exists();
-    }
+        $permissions = $this->group->permissions;
 
-    public function hasPermission($permissionName)
-    {
-        foreach ($this->roles as $role) {
-            if ($role->permissions->contains('name', $permissionName)) {
-                return true;
+        $menuIds = [];
+        $subMenuIds = [];
+
+        foreach ($permissions as $permission) {
+            if ($permission->admin_menu_id) {
+                $menuIds[] = $permission->admin_menu_id;
+            }
+            if ($permission->admin_sub_menu_id) {
+                $subMenuIds[] = $permission->admin_sub_menu_id;
             }
         }
-        return false;
-    }
 
-    public function hasAnyPermission($permissions)
-    {
-        foreach ($this->roles as $role) {
-            foreach ($permissions as $permission) {
-                if ($role->permissions->contains('name', $permission)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
+        $menuIds = array_unique($menuIds);
+        $subMenuIds = array_unique($subMenuIds);
 
-    public function assignRole($roleName)
-    {
-        $role = Role::where('name', $roleName)->first();
-        if ($role && !$this->hasRole($roleName)) {
-            $this->roles()->attach($role->id);
-        }
-    }
+        $menus = AdminMenu::whereIn('id', $menuIds)
+            ->with(['subMenus' => function($query) use ($subMenuIds) {
+                $query->whereIn('id', $subMenuIds);
+            }])
+            ->orderBy('sort_order')
+            ->get();
 
-    public function removeRole($roleName)
-    {
-        $role = Role::where('name', $roleName)->first();
-        if ($role) {
-            $this->roles()->detach($role->id);
-        }
-    }
-
-    public function syncRoles($roles)
-    {
-        $roleIds = Role::whereIn('name', $roles)->pluck('id')->toArray();
-        $this->roles()->sync($roleIds);
-    }
-
-    public function isAdmin()
-    {
-        return $this->hasRole('admin');
+        return $menus;
     }
 }

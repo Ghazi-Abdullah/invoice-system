@@ -13,6 +13,15 @@ use Illuminate\Support\Facades\DB;
 
 class InvoiceController extends Controller
 {
+    // في InvoiceController.php
+    public function __construct()
+    {
+        // تفعيل middleware الصلاحيات
+        $this->middleware('permission:view_invoices')->only(['index', 'show']);
+        $this->middleware('permission:create_invoice')->only(['store']);
+        $this->middleware('permission:edit_invoice')->only(['update', 'updateStatus']);
+        $this->middleware('permission:delete_invoice')->only(['destroy']);
+    }
     /**
      * Display a listing of the resource.
      */
@@ -108,8 +117,8 @@ class InvoiceController extends Controller
 
             // التحقق من أن العميل يخص المستخدم
             $client = Client::where('id', $request->client_id)
-                          ->where('user_id', $request->user()->id)
-                          ->first();
+                ->where('user_id', $request->user()->id)
+                ->first();
 
             if (!$client) {
                 return response()->json([
@@ -120,12 +129,14 @@ class InvoiceController extends Controller
 
             // إنشاء رقم فاتورة
             $lastInvoice = Invoice::where('user_id', $request->user()->id)
-                                ->orderBy('id', 'desc')
-                                ->first();
+                ->orderBy('id', 'desc')
+                ->first();
 
             $invoiceNumber = 'INV-' . date('Ymd') . '-' . str_pad(
                 $lastInvoice ? ($lastInvoice->id + 1) : 1,
-                4, '0', STR_PAD_LEFT
+                4,
+                '0',
+                STR_PAD_LEFT
             );
 
             // حساب المجاميع

@@ -2,10 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\AdminPermission;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use App\Models\User;
-use App\Models\Permission;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -27,7 +27,7 @@ class AuthServiceProvider extends ServiceProvider
     {
         try {
             // تسجيل Gates للصلاحيات الموجودة في قاعدة البيانات
-            $permissions = Permission::all();
+            $permissions = AdminPermission::all();
 
             foreach ($permissions as $permission) {
                 Gate::define($permission->name, function (User $user) use ($permission) {

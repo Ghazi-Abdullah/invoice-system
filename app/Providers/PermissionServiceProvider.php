@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\AdminPermission;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -32,7 +33,7 @@ class PermissionServiceProvider extends ServiceProvider
             return;
         }
 
-        $permissions = Permission::all();
+        $permissions = AdminPermission::all();
 
         foreach ($permissions as $permission) {
             Gate::define($permission->name, function ($user) use ($permission) {

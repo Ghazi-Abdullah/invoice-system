@@ -7,12 +7,11 @@ use Illuminate\Support\Facades\DB;
 
 class PermissionsSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
-    public function run(): void
+    public function run()
     {
-        DB::table('permissions')->insert([
+        DB::statement('SET FOREIGN_KEY_CHECKS = 0');
+        DB::table('admin_permissions')->truncate();
+        DB::table('admin_permissions')->insert([
             // Dashboard Permission
             [
                 'id' => 1,
@@ -85,7 +84,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'عرض الفواتير',
                 'parent_id' => 0,
                 'admin_menu_id' => 3,
-                'admin_sub_menu_id' => 3,
+                'admin_sub_menu_id' => 1,
                 'is_parent' => true
             ],
             [
@@ -95,7 +94,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'عرض جميع الفواتير',
                 'parent_id' => 7,
                 'admin_menu_id' => 3,
-                'admin_sub_menu_id' => 3,
+                'admin_sub_menu_id' => 1,
                 'is_parent' => false
             ],
             [
@@ -105,7 +104,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'إنشاء فاتورة',
                 'parent_id' => 7,
                 'admin_menu_id' => 3,
-                'admin_sub_menu_id' => 4,
+                'admin_sub_menu_id' => 2,
                 'is_parent' => false
             ],
             [
@@ -115,7 +114,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'تعديل فاتورة',
                 'parent_id' => 7,
                 'admin_menu_id' => 3,
-                'admin_sub_menu_id' => 3,
+                'admin_sub_menu_id' => 1,
                 'is_parent' => false
             ],
             [
@@ -125,7 +124,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'حذف فاتورة',
                 'parent_id' => 7,
                 'admin_menu_id' => 3,
-                'admin_sub_menu_id' => 3,
+                'admin_sub_menu_id' => 1,
                 'is_parent' => false
             ],
             [
@@ -135,7 +134,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'عرض تفاصيل الفاتورة',
                 'parent_id' => 7,
                 'admin_menu_id' => 3,
-                'admin_sub_menu_id' => 3,
+                'admin_sub_menu_id' => 1,
                 'is_parent' => false
             ],
             [
@@ -145,7 +144,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'طباعة الفاتورة',
                 'parent_id' => 7,
                 'admin_menu_id' => 3,
-                'admin_sub_menu_id' => 3,
+                'admin_sub_menu_id' => 1,
                 'is_parent' => false
             ],
 
@@ -157,7 +156,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'عرض التقارير',
                 'parent_id' => 0,
                 'admin_menu_id' => 4,
-                'admin_sub_menu_id' => 5,
+                'admin_sub_menu_id' => 1,
                 'is_parent' => true
             ],
             [
@@ -167,7 +166,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'عرض تقرير المبيعات',
                 'parent_id' => 14,
                 'admin_menu_id' => 4,
-                'admin_sub_menu_id' => 5,
+                'admin_sub_menu_id' => 1,
                 'is_parent' => false
             ],
             [
@@ -177,7 +176,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'تصدير التقارير',
                 'parent_id' => 14,
                 'admin_menu_id' => 4,
-                'admin_sub_menu_id' => 5,
+                'admin_sub_menu_id' => 1,
                 'is_parent' => false
             ],
 
@@ -189,7 +188,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'الوصول للإدارة',
                 'parent_id' => 0,
                 'admin_menu_id' => 5,
-                'admin_sub_menu_id' => 6,
+                'admin_sub_menu_id' => 1,
                 'is_parent' => true
             ],
             [
@@ -199,7 +198,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'إدارة مجموعات المستخدمين',
                 'parent_id' => 17,
                 'admin_menu_id' => 5,
-                'admin_sub_menu_id' => 6,
+                'admin_sub_menu_id' => 1,
                 'is_parent' => false
             ],
             [
@@ -209,7 +208,7 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'إدارة المستخدمين',
                 'parent_id' => 17,
                 'admin_menu_id' => 5,
-                'admin_sub_menu_id' => 7,
+                'admin_sub_menu_id' => 2,
                 'is_parent' => false
             ],
             [
@@ -219,9 +218,10 @@ class PermissionsSeeder extends Seeder
                 'description_ar' => 'إدارة الصلاحيات',
                 'parent_id' => 17,
                 'admin_menu_id' => 5,
-                'admin_sub_menu_id' => 8,
+                'admin_sub_menu_id' => 3,
                 'is_parent' => false
             ],
         ]);
+        DB::statement('SET FOREIGN_KEY_CHECKS = 1');
     }
 }

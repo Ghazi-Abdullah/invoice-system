@@ -4,13 +4,18 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class AddAdminGroupToUsers extends Migration
+return new class extends Migration
 {
     public function up()
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->foreignId('admin_group_id')->nullable()->constrained('admin_groups');
-            $table->boolean('is_active')->default(true);
+            if (!Schema::hasColumn('users', 'admin_group_id')) {
+                $table->foreignId('admin_group_id')->nullable()->constrained('admin_groups');
+            }
+
+            if (!Schema::hasColumn('users', 'is_active')) {
+                $table->boolean('is_active')->default(true);
+            }
         });
     }
 
@@ -21,4 +26,4 @@ class AddAdminGroupToUsers extends Migration
             $table->dropColumn(['admin_group_id', 'is_active']);
         });
     }
-}
+};

@@ -14,10 +14,10 @@ class ClientController extends Controller
     public function __construct()
     {
         // تعليق مؤقت للصلاحيات حتى يتم تعيين الأدوار
-        // $this->middleware('permission:view_clients')->only(['index', 'show']);
-        // $this->middleware('permission:create_clients')->only(['store']);
-        // $this->middleware('permission:edit_clients')->only(['update']);
-        // $this->middleware('permission:delete_clients')->only(['destroy']);
+         $this->middleware('permission:view_clients')->only(['index', 'show']);
+         $this->middleware('permission:create_clients')->only(['store']);
+         $this->middleware('permission:edit_clients')->only(['update']);
+         $this->middleware('permission:delete_clients')->only(['destroy']);
     }
 
     public function index(Request $request)
