@@ -1,12 +1,11 @@
 <?php
-// app/Repositories/BaseRepository.php
+
 namespace App\Repositories;
 
-use App\Contracts\RepositoryInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
-abstract class BaseRepository implements RepositoryInterface
+abstract class BaseRepository
 {
     protected $model;
 
@@ -15,44 +14,44 @@ abstract class BaseRepository implements RepositoryInterface
         $this->model = $model;
     }
 
-    public function all(array $columns = ['*']): Collection
+    public function all(): Collection
     {
-        return $this->model->get($columns);
+        return $this->model->all();
     }
 
-    public function paginate(int $perPage = 15, array $columns = ['*'])
+    public function find($id): ?Model
     {
-        return $this->model->paginate($perPage, $columns);
+        return $this->model->find($id);
     }
 
-    public function find(int $id, array $columns = ['*'])
-    {
-        return $this->model->find($id, $columns);
-    }
-
-    public function findBy(string $field, $value, array $columns = ['*'])
-    {
-        return $this->model->where($field, $value)->first($columns);
-    }
-
-    public function create(array $data)
+    public function create(array $data): Model
     {
         return $this->model->create($data);
     }
 
-    public function update(int $id, array $data)
+    public function update($id, array $data): bool
     {
-        $record = $this->find($id);
-        $record->update($data);
-        return $record;
+        $model = $this->find($id);
+        return $model ? $model->update($data) : false;
     }
 
-    public function delete(int $id)
+    public function delete($id): bool
     {
-        return $this->model->destroy($id);
+        $model = $this->find($id);
+        return $model ? $model->delete() : false;
     }
 
-    public function with(array $relations)
+    public function paginate($perPage = 15)
+    {
+        return $this->model->paginate($perPage);
+    }
+
+    public function where($column, $value)
+    {
+        return $this->model->where($column, $value);
+    }
+
+    public function with($relations)
     {
         return $this->model->with($relations);
     }

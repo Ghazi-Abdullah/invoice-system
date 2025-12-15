@@ -5,115 +5,96 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    public function register(Request $request)
-    {
-        try {
-            $request->validate([
-                'name' => 'required|string|max:255',
-                'email' => 'required|string|email|max:255|unique:users',
-                'password' => 'required|string|min:8|confirmed',
-            ]);
-
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-            ]);
-
-            $token = $user->createToken('auth_token')->plainTextToken;
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'user' => $user,
-                    'token' => $token
-                ],
-                'message' => 'User registered successfully'
-            ], 201);
-
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Registration failed: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
     public function login(Request $request)
     {
-        try {
-            $request->validate([
-                'email' => 'required|email',
-                'password' => 'required',
-            ]);
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'password' => 'required'
+        ]);
 
-            $user = User::where('email', $request->email)->first();
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'خطأ في التحقق',
+                'errors' => $validator->errors()
+            ], 422);
+        }
 
-            if (!$user || !Hash::check($request->password, $user->password)) {
-                throw ValidationException::withMessages([
-                    'email' => ['The provided credentials are incorrect.'],
-                ]);
+        $credentials = $request->only('email', 'password');
+
+        if (Auth::attempt($credentials)) {
+            $user = Auth::user();
+
+            // التحقق من حالة المستخدم
+            if (!$user->is_active) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'الحساب غير نشط'
+                ], 401);
             }
 
+            // إنشاء التوكن
             $token = $user->createToken('auth_token')->plainTextToken;
 
+            // تحميل العلاقات مع الصلاحيات
+            $user->load(['group.permissions']);
+
+            // الحصول على صلاحيات المستخدم
+            $permissions = $user->permissions->toArray();
+            $is_admin = $user->admin_group_id === 1;
+
             return response()->json([
-                'success' => true,
+                'status' => true,
+                'message' => 'تم تسجيل الدخول بنجاح',
                 'data' => [
                     'user' => $user,
-                    'token' => $token
-                ],
-                'message' => 'Login successful'
+                    'token' => $token,
+                    'permissions' => $permissions,
+                    'is_admin' => $is_admin
+                ]
             ]);
-
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid credentials'
-            ], 401);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Login failed: ' . $e->getMessage()
-            ], 500);
         }
+
+        return response()->json([
+            'status' => false,
+            'message' => 'بيانات الاعتماد غير صحيحة'
+        ], 401);
     }
 
     public function logout(Request $request)
     {
-        try {
-            $request->user()->currentAccessToken()->delete();
+        $request->user()->tokens()->delete();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Logged out successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Logout failed: ' . $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'status' => true,
+            'message' => 'تم تسجيل الخروج بنجاح'
+        ]);
     }
 
-    public function user(Request $request)
+    public function me(Request $request)
     {
+        $user = $request->user();
+
+        // تحميل العلاقات مع الصلاحيات
+        $user->load(['group.permissions']);
+
+        // الحصول على صلاحيات المستخدم
+        $permissions = $user->permissions->toArray();
+        $is_admin = $user->admin_group_id === 1;
+
         return response()->json([
-            'success' => true,
+            'status' => true,
+            'message' => 'بيانات المستخدم',
             'data' => [
-                'user' => $request->user()
+                'user' => $user,
+                'permissions' => $permissions,
+                'is_admin' => $is_admin
             ]
         ]);
     }

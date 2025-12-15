@@ -1,57 +1,110 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientController;
 use App\Http\Controllers\Api\InvoiceController;
-use App\Http\Controllers\Api\InvoiceReportController;
+use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\AdminGroupController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\PermissionController;
+use App\Http\Controllers\Api\DashboardController;
 
-Route::get('/test', function () {
-    return response()->json([
-        'message' => 'API is working!',
-        'timestamp' => now()->toDateTimeString(),
-        'version' => '1.0.0'
-    ]);
-});
-
-// Authentication routes
-Route::post('/register', [AuthController::class, 'register']);
+// Public routes
 Route::post('/login', [AuthController::class, 'login']);
 
+// Protected routes
 Route::middleware('auth:sanctum')->group(function () {
+    // Auth
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
 
-    Route::get('/user', function (Request $request) {
-        return $request->user();
+    // Test endpoints
+    Route::get('/test/clients', function () {
+        $clients = \App\Models\Client::all();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Test endpoint',
+            'total_clients' => $clients->count(),
+            'clients' => $clients->take(5)
+        ]);
     });
 
-    // Clients Routes
+    // Dashboard
+    Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
+    Route::get('/dashboard/recent-data', [DashboardController::class, 'getRecentData']);
+
+    // Clients with permission checking
     Route::get('/clients', [ClientController::class, 'index']);
+    Route::get('/clients/{id}', [ClientController::class, 'show']);
     Route::post('/clients', [ClientController::class, 'store']);
-    Route::get('/clients/{client}', [ClientController::class, 'show']);
-    Route::put('/clients/{client}', [ClientController::class, 'update']);
-    Route::delete('/clients/{client}', [ClientController::class, 'destroy']);
+    Route::put('/clients/{id}', [ClientController::class, 'update']);
+    Route::delete('/clients/{id}', [ClientController::class, 'destroy']);
 
-    // Invoices
+    // Invoices with permission checking
     Route::get('/invoices', [InvoiceController::class, 'index']);
+    Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
     Route::post('/invoices', [InvoiceController::class, 'store']);
-    Route::get('/invoices/{invoice}', [InvoiceController::class, 'show']);
-    Route::put('/invoices/{invoice}', [InvoiceController::class, 'update']);
-    Route::delete('/invoices/{invoice}', [InvoiceController::class, 'destroy']);
-    Route::patch('/invoices/{invoice}/status', [InvoiceController::class, 'updateStatus']);
+    Route::put('/invoices/{id}', [InvoiceController::class, 'update']);
+    Route::put('/invoices/{id}/status', [InvoiceController::class, 'updateStatus']);
+    Route::delete('/invoices/{id}', [InvoiceController::class, 'destroy']);
 
-    // رابط جديد لربط الفواتير الافتراضية
-    Route::post('/invoices/link-defaults', [InvoiceController::class, 'linkDefaultInvoices']);
+    // Reports with permission checking
+    Route::get('/reports/sales', [ReportController::class, 'salesReport']);
+    Route::post('/reports/export', [ReportController::class, 'export']);
 
-    // ===== تقارير الفواتير =====
-    Route::prefix('reports')->group(function () {
-        // تقرير الفواتير الرئيسي (سيعمل مع مكون Vue.js الخاص بك)
-        Route::get('/invoices', [InvoiceReportController::class, 'index']);
+    // Administration routes - only for users with administration permission
+    // Administration routes - only for users with administration permission
+    Route::prefix('admin')->group(function () {
+        // Admin groups
+        Route::get('/groups', [AdminGroupController::class, 'index']);
+        Route::get('/groups/{id}', [AdminGroupController::class, 'show']);
+        Route::post('/groups', [AdminGroupController::class, 'store']);
+        Route::put('/groups/{id}', [AdminGroupController::class, 'update']);
+        Route::delete('/groups/{id}', [AdminGroupController::class, 'destroy']);
+        Route::post('/groups/{id}/permissions', [AdminGroupController::class, 'updatePermissions']);
+        Route::get('/groups/{id}/available-permissions', [AdminGroupController::class, 'getAvailablePermissions']);
 
-        // تقارير متخصصة
-        Route::get('/invoices/clients', [InvoiceReportController::class, 'clientReport']);
-        Route::get('/invoices/overdue', [InvoiceReportController::class, 'overdueReport']);
-        Route::get('/invoices/revenue', [InvoiceReportController::class, 'revenueReport']);
+        // Users management
+        Route::get('/users', [UserController::class, 'index']);
+        Route::get('/users/{id}', [UserController::class, 'show']);
+        Route::post('/users', [UserController::class, 'store']);
+        Route::put('/users/{id}', [UserController::class, 'update']);
+        Route::delete('/users/{id}', [UserController::class, 'destroy']);
+        Route::get('/users/groups/list', [UserController::class, 'getGroups']);
+
+        // Permissions (منفصلة)
+        Route::get('/permissions', [PermissionController::class, 'index']);
+        Route::get('/permissions/menus', [PermissionController::class, 'getMenusWithPermissions']);
+        Route::post('/permissions', [PermissionController::class, 'store']);
+        Route::get('/permissions/{id}', [PermissionController::class, 'show']);
+        Route::put('/permissions/{id}', [PermissionController::class, 'update']);
+        Route::delete('/permissions/{id}', [PermissionController::class, 'destroy']);
+    });
+
+    // Get user permissions
+    Route::get('/user-permissions', function () {
+        $user = auth()->user();
+
+        if (!$user->group) {
+            return response()->json([
+                'status' => true,
+                'message' => 'صلاحيات المستخدم',
+                'data' => [
+                    'permissions' => [],
+                    'is_admin' => false
+                ]
+            ]);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'صلاحيات المستخدم',
+            'data' => [
+                'permissions' => $user->group->permissions,
+                'is_admin' => $user->admin_group_id == 1
+            ]
+        ]);
     });
 });
