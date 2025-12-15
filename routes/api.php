@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\AdminGroupController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\PermissionController;
+use App\Http\Controllers\Api\DashboardController;
 
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -18,37 +19,92 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
 
-    // Clients with permission middleware
-    Route::middleware('permission:view_clients')->get('/clients', [ClientController::class, 'index']);
-    Route::middleware('permission:view_clients')->get('/clients/{client}', [ClientController::class, 'show']);
-    Route::middleware('permission:create_client')->post('/clients', [ClientController::class, 'store']);
-    Route::middleware('permission:edit_client')->put('/clients/{client}', [ClientController::class, 'update']);
-    Route::middleware('permission:delete_client')->delete('/clients/{client}', [ClientController::class, 'destroy']);
+    // Test endpoints
+    Route::get('/test/clients', function () {
+        $clients = \App\Models\Client::all();
 
-    // Invoices with permission middleware
-    Route::middleware('permission:view_invoices')->get('/invoices', [InvoiceController::class, 'index']);
-    Route::middleware('permission:view_invoices')->get('/invoices/{invoice}', [InvoiceController::class, 'show']);
-    Route::middleware('permission:create_invoice')->post('/invoices', [InvoiceController::class, 'store']);
-    Route::middleware('permission:edit_invoice')->put('/invoices/{invoice}', [InvoiceController::class, 'update']);
-    Route::middleware('permission:delete_invoice')->delete('/invoices/{invoice}', [InvoiceController::class, 'destroy']);
+        return response()->json([
+            'status' => true,
+            'message' => 'Test endpoint',
+            'total_clients' => $clients->count(),
+            'clients' => $clients->take(5)
+        ]);
+    });
 
-    // Reports with permission middleware
-    Route::middleware('permission:view_sales_report')->get('/reports/sales', [ReportController::class, 'salesReport']);
-    Route::middleware('permission:export_reports')->post('/reports/export', [ReportController::class, 'export']);
+    // Dashboard
+    Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
+    Route::get('/dashboard/recent-data', [DashboardController::class, 'getRecentData']);
+
+    // Clients with permission checking
+    Route::get('/clients', [ClientController::class, 'index']);
+    Route::get('/clients/{id}', [ClientController::class, 'show']);
+    Route::post('/clients', [ClientController::class, 'store']);
+    Route::put('/clients/{id}', [ClientController::class, 'update']);
+    Route::delete('/clients/{id}', [ClientController::class, 'destroy']);
+
+    // Invoices with permission checking
+    Route::get('/invoices', [InvoiceController::class, 'index']);
+    Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
+    Route::post('/invoices', [InvoiceController::class, 'store']);
+    Route::put('/invoices/{id}', [InvoiceController::class, 'update']);
+    Route::put('/invoices/{id}/status', [InvoiceController::class, 'updateStatus']);
+    Route::delete('/invoices/{id}', [InvoiceController::class, 'destroy']);
+
+    // Reports with permission checking
+    Route::get('/reports/sales', [ReportController::class, 'salesReport']);
+    Route::post('/reports/export', [ReportController::class, 'export']);
 
     // Administration routes - only for users with administration permission
-    Route::prefix('admin')->middleware('permission:administration')->group(function () {
-        Route::apiResource('groups', AdminGroupController::class);
-        Route::post('groups/{adminGroup}/permissions', [AdminGroupController::class, 'updatePermissions']);
-        Route::get('groups/{adminGroup}/available-permissions', [AdminGroupController::class, 'getAvailablePermissions']);
+    // Administration routes - only for users with administration permission
+    Route::prefix('admin')->group(function () {
+        // Admin groups
+        Route::get('/groups', [AdminGroupController::class, 'index']);
+        Route::get('/groups/{id}', [AdminGroupController::class, 'show']);
+        Route::post('/groups', [AdminGroupController::class, 'store']);
+        Route::put('/groups/{id}', [AdminGroupController::class, 'update']);
+        Route::delete('/groups/{id}', [AdminGroupController::class, 'destroy']);
+        Route::post('/groups/{id}/permissions', [AdminGroupController::class, 'updatePermissions']);
+        Route::get('/groups/{id}/available-permissions', [AdminGroupController::class, 'getAvailablePermissions']);
 
-        Route::apiResource('users', UserController::class);
-        Route::get('users/groups/list', [UserController::class, 'getGroups']);
+        // Users management
+        Route::get('/users', [UserController::class, 'index']);
+        Route::get('/users/{id}', [UserController::class, 'show']);
+        Route::post('/users', [UserController::class, 'store']);
+        Route::put('/users/{id}', [UserController::class, 'update']);
+        Route::delete('/users/{id}', [UserController::class, 'destroy']);
+        Route::get('/users/groups/list', [UserController::class, 'getGroups']);
 
-        Route::get('permissions', [PermissionController::class, 'index']);
-        Route::get('permissions/menus', [PermissionController::class, 'getMenusWithPermissions']);
+        // Permissions (منفصلة)
+        Route::get('/permissions', [PermissionController::class, 'index']);
+        Route::get('/permissions/menus', [PermissionController::class, 'getMenusWithPermissions']);
+        Route::post('/permissions', [PermissionController::class, 'store']);
+        Route::get('/permissions/{id}', [PermissionController::class, 'show']);
+        Route::put('/permissions/{id}', [PermissionController::class, 'update']);
+        Route::delete('/permissions/{id}', [PermissionController::class, 'destroy']);
     });
 
     // Get user permissions
-    Route::get('/user-permissions', [PermissionController::class, 'getUserPermissions']);
+    Route::get('/user-permissions', function () {
+        $user = auth()->user();
+
+        if (!$user->group) {
+            return response()->json([
+                'status' => true,
+                'message' => 'صلاحيات المستخدم',
+                'data' => [
+                    'permissions' => [],
+                    'is_admin' => false
+                ]
+            ]);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'صلاحيات المستخدم',
+            'data' => [
+                'permissions' => $user->group->permissions,
+                'is_admin' => $user->admin_group_id == 1
+            ]
+        ]);
+    });
 });

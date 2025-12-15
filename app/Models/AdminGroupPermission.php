@@ -11,5 +11,6 @@ class AdminGroupPermission extends Model
 
     protected $table = 'admin_group_permissions';
 
-    protected $fillable = ['admin_group_id', 'permission_id'];
+    // تصحيح أسماء الحقول
+    protected $fillable = ['admin_group_id', 'admin_permission_id'];
 }

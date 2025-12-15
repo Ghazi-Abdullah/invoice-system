@@ -14,17 +14,34 @@ class InvoiceItem extends Model
         'description',
         'quantity',
         'unit_price',
-        'total'
+        'total',
+        'tax_rate'
     ];
 
     protected $casts = [
         'quantity' => 'decimal:2',
         'unit_price' => 'decimal:2',
         'total' => 'decimal:2',
+        'tax_rate' => 'decimal:2'
     ];
 
+    /**
+     * العلاقة مع الفاتورة
+     */
     public function invoice()
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    /**
+     * حساب الإجمالي تلقائياً قبل الحفظ
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function ($item) {
+            $item->total = $item->quantity * $item->unit_price;
+        });
     }
 }

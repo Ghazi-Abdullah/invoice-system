@@ -26,62 +26,98 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'password' => 'hashed',
         'is_active' => 'boolean'
     ];
 
+    /**
+     * العلاقة مع مجموعة الإدارة
+     */
     public function group()
     {
         return $this->belongsTo(AdminGroup::class, 'admin_group_id');
     }
 
-    public function hasPermission($permissionTitle)
-    {
-        if (!$this->group) {
-            return false;
-        }
-
-        return $this->group->permissions()->where('title', $permissionTitle)->exists();
-    }
-
+    /**
+     * الحصول على جميع صلاحيات المستخدم من مجموعته
+     */
     public function getPermissionsAttribute()
     {
         if (!$this->group) {
-            return [];
+            return collect();
         }
 
-        return $this->group->permissions->pluck('title')->toArray();
+        // تحميل صلاحيات المجموعة إذا لم تكن محملة
+        if (!$this->group->relationLoaded('permissions')) {
+            $this->group->load('permissions');
+        }
+
+        return $this->group->permissions->pluck('title');
     }
 
-    public function getMenusAttribute()
+    /**
+     * التحقق مما إذا كان المستخدم لديه صلاحية معينة
+     */
+    public function hasPermission($permission)
     {
+        // إذا كان المستخدم غير نشط، لا يملك أي صلاحيات
+        if (!$this->is_active) {
+            \Log::warning('User is not active', ['user_id' => $this->id]);
+            return false;
+        }
+
+        // إذا كان المستخدم في المجموعة 1 (مدير) فلديه جميع الصلاحيات
+        if ($this->admin_group_id == 1) {
+            \Log::info('User is admin, has all permissions', ['user_id' => $this->id]);
+            return true;
+        }
+
+        // التحقق من صلاحيات المجموعة
         if (!$this->group) {
-            return [];
+            \Log::warning('User has no group', ['user_id' => $this->id]);
+            return false;
         }
 
-        $permissions = $this->group->permissions;
+        // تحميل العلاقة إذا لم تكن محملة
+        if (!$this->group->relationLoaded('permissions')) {
+            $this->group->load('permissions');
+        }
 
-        $menuIds = [];
-        $subMenuIds = [];
+        $hasPermission = $this->group->permissions->contains('title', $permission);
 
+        \Log::info('Permission check', [
+            'user_id' => $this->id,
+            'permission' => $permission,
+            'has_permission' => $hasPermission,
+            'group_permissions' => $this->group->permissions->pluck('title')->toArray()
+        ]);
+
+        return $hasPermission;
+    }
+
+    /**
+     * التحقق مما إذا كان المستخدم لديه أي من الصلاحيات المحددة
+     */
+    public function hasAnyPermission($permissions)
+    {
         foreach ($permissions as $permission) {
-            if ($permission->admin_menu_id) {
-                $menuIds[] = $permission->admin_menu_id;
-            }
-            if ($permission->admin_sub_menu_id) {
-                $subMenuIds[] = $permission->admin_sub_menu_id;
+            if ($this->hasPermission($permission)) {
+                return true;
             }
         }
+        return false;
+    }
 
-        $menuIds = array_unique($menuIds);
-        $subMenuIds = array_unique($subMenuIds);
-
-        $menus = AdminMenu::whereIn('id', $menuIds)
-            ->with(['subMenus' => function($query) use ($subMenuIds) {
-                $query->whereIn('id', $subMenuIds);
-            }])
-            ->orderBy('sort_order')
-            ->get();
-
-        return $menus;
+    /**
+     * التحقق مما إذا كان المستخدم لديه جميع الصلاحيات المحددة
+     */
+    public function hasAllPermissions($permissions)
+    {
+        foreach ($permissions as $permission) {
+            if (!$this->hasPermission($permission)) {
+                return false;
+            }
+        }
+        return true;
     }
 }

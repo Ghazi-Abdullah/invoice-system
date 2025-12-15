@@ -4,508 +4,460 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
-use App\Models\Client;
 use App\Models\InvoiceItem;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator; // تصحيح الاستيراد
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 
 class InvoiceController extends Controller
 {
-    // في InvoiceController.php
-    public function __construct()
-    {
-        // تفعيل middleware الصلاحيات
-        $this->middleware('permission:view_invoices')->only(['index', 'show']);
-        $this->middleware('permission:create_invoice')->only(['store']);
-        $this->middleware('permission:edit_invoice')->only(['update', 'updateStatus']);
-        $this->middleware('permission:delete_invoice')->only(['destroy']);
-    }
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
         try {
-            $userId = $request->user()->id;
+            $user = Auth::user();
 
-            Log::info('🧾 جلب الفواتير للمستخدم:', [
-                'user_id' => $userId,
-                'email' => $request->user()->email
-            ]);
-
-            // استعلام لجميع الفواتير الخاصة بالمستخدم الحالي
-            $query = Invoice::where('user_id', $userId)
-                ->with(['client', 'items']);
-
-            // تطبيق الفلاتر
-            if ($request->has('status') && $request->status !== '') {
-                $query->where('status', $request->status);
-            }
-
-            if ($request->has('client_id') && $request->client_id !== '') {
-                $query->where('client_id', $request->client_id);
-            }
-
-            if ($request->has('search') && $request->search !== '') {
-                $query->where(function ($q) use ($request) {
-                    $q->where('invoice_number', 'like', '%' . $request->search . '%')
-                        ->orWhereHas('client', function ($clientQuery) use ($request) {
-                            $clientQuery->where('name', 'like', '%' . $request->search . '%')
-                                ->orWhere('email', 'like', '%' . $request->search . '%');
-                        });
-                });
-            }
-
-            $invoices = $query->latest()->paginate(20);
-
-            Log::info('📊 نتيجة جلب الفواتير:', [
-                'total_invoices' => $invoices->total(),
-                'current_count' => $invoices->count(),
-                'user_id' => $userId
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'data' => $invoices
-            ]);
-        } catch (\Exception $e) {
-            Log::error('❌ خطأ في جلب الفواتير: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-                'user_id' => $request->user()->id ?? 'غير معروف'
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'فشل في جلب الفواتير: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        DB::beginTransaction();
-
-        try {
-            Log::info('🔄 إنشاء فاتورة جديدة:', [
-                'user_id' => $request->user()->id,
-                'data' => $request->all()
-            ]);
-
-            $validator = Validator::make($request->all(), [
-                'client_id' => 'required|exists:clients,id',
-                'issue_date' => 'required|date',
-                'due_date' => 'required|date|after_or_equal:issue_date',
-                'items' => 'required|array|min:1',
-                'items.*.description' => 'required|string|max:255',
-                'items.*.quantity' => 'required|numeric|min:0.01|max:999999.99',
-                'items.*.unit_price' => 'required|numeric|min:0|max:999999.99',
-                'notes' => 'nullable|string'
-            ]);
-
-            if ($validator->fails()) {
+            if (!$user) {
                 return response()->json([
-                    'success' => false,
-                    'message' => 'فشل في التحقق من البيانات',
-                    'errors' => $validator->errors()
-                ], 422);
+                    'status' => false,
+                    'message' => 'يجب تسجيل الدخول أولاً'
+                ], 401);
             }
 
-            // التحقق من أن العميل يخص المستخدم
-            $client = Client::where('id', $request->client_id)
-                ->where('user_id', $request->user()->id)
-                ->first();
-
-            if (!$client) {
+            if (!$user->hasPermission('view_invoices')) {
+                Log::warning('User does not have view_invoices permission', ['user_id' => $user->id]);
                 return response()->json([
-                    'success' => false,
-                    'message' => 'العميل غير موجود أو غير مسموح به'
+                    'status' => false,
+                    'message' => 'ليس لديك صلاحية لعرض الفواتير'
                 ], 403);
             }
 
-            // إنشاء رقم فاتورة
-            $lastInvoice = Invoice::where('user_id', $request->user()->id)
-                ->orderBy('id', 'desc')
-                ->first();
-
-            $invoiceNumber = 'INV-' . date('Ymd') . '-' . str_pad(
-                $lastInvoice ? ($lastInvoice->id + 1) : 1,
-                4,
-                '0',
-                STR_PAD_LEFT
-            );
-
-            // حساب المجاميع
-            $subtotal = 0;
-            foreach ($request->items as $item) {
-                $itemTotal = round($item['quantity'] * $item['unit_price'], 2);
-                $subtotal += $itemTotal;
-            }
-
-            $taxAmount = round($subtotal * 0.15, 2);
-            $totalAmount = round($subtotal + $taxAmount, 2);
-
-            // إنشاء الفاتورة
-            $invoice = Invoice::create([
-                'invoice_number' => $invoiceNumber,
-                'client_id' => $request->client_id,
-                'user_id' => $request->user()->id,
-                'issue_date' => $request->issue_date,
-                'due_date' => $request->due_date,
-                'subtotal' => $subtotal,
-                'tax_amount' => $taxAmount,
-                'total_amount' => $totalAmount,
-                'status' => 'draft',
-                'notes' => $request->notes,
+            Log::info('Fetching invoices for user', [
+                'user_id' => $user->id,
+                'admin_group_id' => $user->admin_group_id,
+                'is_admin' => $user->admin_group_id == 1
             ]);
 
-            // إنشاء عناصر الفاتورة
-            foreach ($request->items as $item) {
-                $itemTotal = round($item['quantity'] * $item['unit_price'], 2);
+            $invoices = Invoice::with(['client', 'items']);
 
-                InvoiceItem::create([
-                    'invoice_id' => $invoice->id,
-                    'description' => $item['description'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'total' => $itemTotal,
-                ]);
+            // الفلاتر
+            if ($request->has('status') && $request->status) {
+                $invoices->where('status', $request->status);
             }
 
-            // تحميل العلاقات
-            $invoice->load(['client', 'items']);
+            if ($request->has('client_id') && $request->client_id) {
+                $invoices->where('client_id', $request->client_id);
+            }
 
-            DB::commit();
+            if ($request->has('search') && $request->search) {
+                $invoices->where(function ($query) use ($request) {
+                    $query->where('invoice_number', 'like', '%' . $request->search . '%')
+                          ->orWhereHas('client', function ($q) use ($request) {
+                              $q->where('name', 'like', '%' . $request->search . '%')
+                                ->orWhere('email', 'like', '%' . $request->search . '%');
+                          });
+                });
+            }
 
-            Log::info('✅ تم إنشاء فاتورة جديدة:', [
-                'id' => $invoice->id,
-                'invoice_number' => $invoice->invoice_number,
-                'user_id' => $invoice->user_id
+            // الترتيب
+            $sortBy = $request->get('sort_by', 'created_at');
+            $sortOrder = $request->get('sort_order', 'desc');
+            $invoices->orderBy($sortBy, $sortOrder);
+
+            // الصفحة
+            $perPage = $request->get('per_page', 15);
+            $result = $invoices->paginate($perPage);
+
+            Log::info('Invoices fetched successfully', [
+                'total' => $result->total(),
+                'count' => $result->count()
             ]);
 
             return response()->json([
-                'success' => true,
-                'message' => 'تم إنشاء الفاتورة بنجاح',
-                'data' => $invoice
-            ], 201);
+                'status' => true,
+                'message' => 'تم جلب الفواتير بنجاح',
+                'data' => $result
+            ]);
+
         } catch (\Exception $e) {
-            DB::rollBack();
-
-            Log::error('❌ خطأ في إنشاء الفاتورة: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-                'user_id' => $request->user()->id ?? 'غير معروف'
+            Log::error('Error fetching invoices: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
-                'success' => false,
-                'message' => 'فشل في إنشاء الفاتورة: ' . $e->getMessage()
+                'status' => false,
+                'message' => 'حدث خطأ في جلب الفواتير: ' . $e->getMessage()
             ], 500);
         }
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Request $request, $id)
+    public function show($id)
     {
         try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'يجب تسجيل الدخول أولاً'
+                ], 401);
+            }
+
+            if (!$user->hasPermission('view_invoices')) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'ليس لديك صلاحية لعرض الفواتير'
+                ], 403);
+            }
+
             $invoice = Invoice::with(['client', 'items'])->find($id);
 
             if (!$invoice) {
                 return response()->json([
-                    'success' => false,
+                    'status' => false,
                     'message' => 'الفاتورة غير موجودة'
                 ], 404);
             }
 
-            // التحقق من أن الفاتورة تخص المستخدم الحالي
-            if ($request->user()->id !== $invoice->user_id) {
-                Log::warning('⚠️ محاولة وصول غير مصرح للفاتورة:', [
-                    'invoice_user_id' => $invoice->user_id,
-                    'current_user_id' => $request->user()->id
-                ]);
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'غير مصرح بالوصول لهذه الفاتورة'
-                ], 403);
-            }
-
             return response()->json([
-                'success' => true,
+                'status' => true,
+                'message' => 'تم جلب الفاتورة بنجاح',
                 'data' => $invoice
             ]);
-        } catch (\Exception $e) {
-            Log::error('❌ خطأ في جلب الفاتورة: ' . $e->getMessage(), [
-                'invoice_id' => $id,
-                'trace' => $e->getTraceAsString()
-            ]);
 
+        } catch (\Exception $e) {
+            Log::error('Error fetching invoice: ' . $e->getMessage());
             return response()->json([
-                'success' => false,
-                'message' => 'فشل في جلب الفاتورة: ' . $e->getMessage()
+                'status' => false,
+                'message' => 'حدث خطأ في جلب الفاتورة'
             ], 500);
         }
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, $id)
+    public function store(Request $request)
     {
-        DB::beginTransaction();
-
         try {
-            $invoice = Invoice::find($id);
+            $user = Auth::user();
 
-            if (!$invoice) {
+            if (!$user) {
                 return response()->json([
-                    'success' => false,
-                    'message' => 'الفاتورة غير موجودة'
-                ], 404);
+                    'status' => false,
+                    'message' => 'يجب تسجيل الدخول أولاً'
+                ], 401);
             }
 
-            // التحقق من أن الفاتورة تخص المستخدم الحالي
-            if ($request->user()->id !== $invoice->user_id) {
+            if (!$user->hasPermission('create_invoice')) {
+                Log::warning('User does not have create_invoice permission', ['user_id' => $user->id]);
                 return response()->json([
-                    'success' => false,
-                    'message' => 'غير مصرح بتحديث هذه الفاتورة'
+                    'status' => false,
+                    'message' => 'ليس لديك صلاحية لإنشاء فواتير'
                 ], 403);
             }
 
             $validator = Validator::make($request->all(), [
+                'client_id' => 'required|exists:clients,id',
+                'invoice_number' => 'required|string|unique:invoices',
                 'issue_date' => 'required|date',
                 'due_date' => 'required|date|after_or_equal:issue_date',
                 'items' => 'required|array|min:1',
-                'items.*.description' => 'required|string|max:255',
-                'items.*.quantity' => 'required|numeric|min:0.01|max:999999.99',
-                'items.*.unit_price' => 'required|numeric|min:0|max:999999.99',
-                'notes' => 'nullable|string'
+                'items.*.description' => 'required|string',
+                'items.*.quantity' => 'required|numeric|min:1',
+                'items.*.unit_price' => 'required|numeric|min:0',
+                'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
+                'notes' => 'nullable|string',
+                'terms' => 'nullable|string'
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
-                    'success' => false,
-                    'message' => 'فشل في التحقق من البيانات',
+                    'status' => false,
+                    'message' => 'خطأ في التحقق',
                     'errors' => $validator->errors()
                 ], 422);
             }
 
-            // حذف العناصر القديمة
-            $invoice->items()->delete();
-
-            // حساب المجاميع الجديدة
+            // حساب المجموع
             $subtotal = 0;
+            $tax_total = 0;
+
             foreach ($request->items as $item) {
-                $itemTotal = round($item['quantity'] * $item['unit_price'], 2);
+                $itemTotal = $item['quantity'] * $item['unit_price'];
                 $subtotal += $itemTotal;
+
+                $taxRate = $item['tax_rate'] ?? 0;
+                $tax_total += $itemTotal * ($taxRate / 100);
             }
 
-            $taxAmount = round($subtotal * 0.15, 2);
-            $totalAmount = round($subtotal + $taxAmount, 2);
+            $total_amount = $subtotal + $tax_total;
 
-            // تحديث الفاتورة
-            $invoice->update([
+            // إنشاء الفاتورة
+            $invoice = Invoice::create([
+                'client_id' => $request->client_id,
+                'invoice_number' => $request->invoice_number,
                 'issue_date' => $request->issue_date,
                 'due_date' => $request->due_date,
                 'subtotal' => $subtotal,
-                'tax_amount' => $taxAmount,
-                'total_amount' => $totalAmount,
+                'tax_total' => $tax_total,
+                'total_amount' => $total_amount,
+                'status' => 'draft',
                 'notes' => $request->notes,
+                'terms' => $request->terms,
+                'user_id' => $user->id
             ]);
 
-            // إضافة العناصر الجديدة
+            // إضافة العناصر
             foreach ($request->items as $item) {
-                $itemTotal = round($item['quantity'] * $item['unit_price'], 2);
-
-                InvoiceItem::create([
-                    'invoice_id' => $invoice->id,
+                $itemTotal = $item['quantity'] * $item['unit_price'];
+                $invoice->items()->create([
                     'description' => $item['description'],
                     'quantity' => $item['quantity'],
                     'unit_price' => $item['unit_price'],
                     'total' => $itemTotal,
+                    'tax_rate' => $item['tax_rate'] ?? 0
                 ]);
             }
 
             $invoice->load(['client', 'items']);
 
-            DB::commit();
-
-            Log::info('✏️ تم تحديث الفاتورة:', [
-                'id' => $invoice->id,
-                'invoice_number' => $invoice->invoice_number
+            Log::info('Invoice created successfully', [
+                'invoice_id' => $invoice->id,
+                'invoice_number' => $invoice->invoice_number,
+                'client_id' => $invoice->client_id,
+                'total_amount' => $invoice->total_amount
             ]);
 
             return response()->json([
-                'success' => true,
-                'message' => 'تم تحديث الفاتورة بنجاح',
+                'status' => true,
+                'message' => 'تم إنشاء الفاتورة بنجاح',
                 'data' => $invoice
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
+            ], 201);
 
-            Log::error('❌ خطأ في تحديث الفاتورة: ' . $e->getMessage(), [
-                'invoice_id' => $id,
+        } catch (\Exception $e) {
+            Log::error('Error creating invoice: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
-
             return response()->json([
-                'success' => false,
-                'message' => 'فشل في تحديث الفاتورة: ' . $e->getMessage()
+                'status' => false,
+                'message' => 'حدث خطأ في إنشاء الفاتورة: ' . $e->getMessage()
             ], 500);
         }
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Request $request, $id)
+    public function update(Request $request, $id)
     {
         try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'يجب تسجيل الدخول أولاً'
+                ], 401);
+            }
+
+            if (!$user->hasPermission('edit_invoice')) {
+                Log::warning('User does not have edit_invoice permission', ['user_id' => $user->id]);
+                return response()->json([
+                    'status' => false,
+                    'message' => 'ليس لديك صلاحية لتعديل الفواتير'
+                ], 403);
+            }
+
             $invoice = Invoice::find($id);
 
             if (!$invoice) {
                 return response()->json([
-                    'success' => false,
+                    'status' => false,
                     'message' => 'الفاتورة غير موجودة'
                 ], 404);
-            }
-
-            // التحقق من أن الفاتورة تخص المستخدم الحالي
-            if ($request->user()->id !== $invoice->user_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'غير مصرح بحذف هذه الفاتورة'
-                ], 403);
-            }
-
-            $invoice->delete();
-
-            Log::info('🗑️ تم حذف الفاتورة:', [
-                'id' => $invoice->id,
-                'invoice_number' => $invoice->invoice_number
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'تم حذف الفاتورة بنجاح'
-            ]);
-        } catch (\Exception $e) {
-            Log::error('❌ خطأ في حذف الفاتورة: ' . $e->getMessage(), [
-                'invoice_id' => $id,
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'فشل في حذف الفاتورة: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Update invoice status.
-     */
-    public function updateStatus(Request $request, $id)
-    {
-        try {
-            $invoice = Invoice::find($id);
-
-            if (!$invoice) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'الفاتورة غير موجودة'
-                ], 404);
-            }
-
-            // التحقق من أن الفاتورة تخص المستخدم الحالي
-            if ($request->user()->id !== $invoice->user_id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'غير مصرح بتحديث حالة هذه الفاتورة'
-                ], 403);
             }
 
             $validator = Validator::make($request->all(), [
-                'status' => 'required|in:draft,sent,paid,overdue'
+                'client_id' => 'sometimes|exists:clients,id',
+                'invoice_number' => 'sometimes|string|unique:invoices,invoice_number,' . $id,
+                'issue_date' => 'sometimes|date',
+                'due_date' => 'sometimes|date|after_or_equal:issue_date',
+                'status' => 'sometimes|in:draft,sent,paid,overdue,cancelled',
+                'notes' => 'nullable|string',
+                'terms' => 'nullable|string'
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
-                    'success' => false,
-                    'message' => 'فشل في التحقق من البيانات',
+                    'status' => false,
+                    'message' => 'خطأ في التحقق',
                     'errors' => $validator->errors()
                 ], 422);
             }
 
-            $invoice->update(['status' => $request->status]);
+            // إذا تم تحديث العناصر
+            if ($request->has('items') && is_array($request->items)) {
+                // حذف العناصر القديمة
+                $invoice->items()->delete();
+
+                // حساب المجموع الجديد
+                $subtotal = 0;
+                $tax_total = 0;
+
+                foreach ($request->items as $item) {
+                    $itemTotal = $item['quantity'] * $item['unit_price'];
+                    $subtotal += $itemTotal;
+
+                    $taxRate = $item['tax_rate'] ?? 0;
+                    $tax_total += $itemTotal * ($taxRate / 100);
+
+                    // إضافة العنصر الجديد
+                    $invoice->items()->create([
+                        'description' => $item['description'],
+                        'quantity' => $item['quantity'],
+                        'unit_price' => $item['unit_price'],
+                        'total' => $itemTotal,
+                        'tax_rate' => $item['tax_rate'] ?? 0
+                    ]);
+                }
+
+                $total_amount = $subtotal + $tax_total;
+
+                // تحديث المجاميع
+                $invoice->update([
+                    'subtotal' => $subtotal,
+                    'tax_total' => $tax_total,
+                    'total_amount' => $total_amount
+                ]);
+            }
+
+            $invoice->update($request->only([
+                'client_id', 'invoice_number', 'issue_date', 'due_date', 'status', 'notes', 'terms'
+            ]));
 
             $invoice->load(['client', 'items']);
 
-            Log::info('🔄 تم تحديث حالة الفاتورة:', [
-                'id' => $invoice->id,
-                'status' => $invoice->status
-            ]);
+            Log::info('Invoice updated successfully', ['invoice_id' => $invoice->id]);
 
             return response()->json([
-                'success' => true,
-                'data' => $invoice,
-                'message' => 'تم تحديث حالة الفاتورة بنجاح'
+                'status' => true,
+                'message' => 'تم تحديث الفاتورة بنجاح',
+                'data' => $invoice
             ]);
+
         } catch (\Exception $e) {
-            Log::error('❌ خطأ في تحديث حالة الفاتورة: ' . $e->getMessage(), [
-                'invoice_id' => $id,
-                'trace' => $e->getTraceAsString()
-            ]);
-
+            Log::error('Error updating invoice: ' . $e->getMessage());
             return response()->json([
-                'success' => false,
-                'message' => 'فشل في تحديث حالة الفاتورة: ' . $e->getMessage()
+                'status' => false,
+                'message' => 'حدث خطأ في تحديث الفاتورة'
             ], 500);
         }
     }
 
-    /**
-     * Dashboard statistics.
-     */
-    public function dashboardStats(Request $request)
+    public function destroy($id)
     {
         try {
-            $userId = $request->user()->id;
+            $user = Auth::user();
 
-            $stats = [
-                'total_invoices' => Invoice::where('user_id', $userId)->count(),
-                'total_clients' => Client::where('user_id', $userId)->count(),
-                'total_paid' => Invoice::where('user_id', $userId)
-                    ->where('status', 'paid')
-                    ->sum('total_amount'),
-                'total_pending' => Invoice::where('user_id', $userId)
-                    ->whereIn('status', ['draft', 'sent'])
-                    ->sum('total_amount'),
-                'total_overdue' => Invoice::where('user_id', $userId)
-                    ->where('status', 'overdue')
-                    ->sum('total_amount'),
-                'recent_invoices' => Invoice::where('user_id', $userId)
-                    ->with('client')
-                    ->latest()
-                    ->limit(5)
-                    ->get()
-            ];
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'يجب تسجيل الدخول أولاً'
+                ], 401);
+            }
+
+            if (!$user->hasPermission('delete_invoice')) {
+                Log::warning('User does not have delete_invoice permission', ['user_id' => $user->id]);
+                return response()->json([
+                    'status' => false,
+                    'message' => 'ليس لديك صلاحية لحذف الفواتير'
+                ], 403);
+            }
+
+            $invoice = Invoice::find($id);
+
+            if (!$invoice) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'الفاتورة غير موجودة'
+                ], 404);
+            }
+
+            // حذف العناصر المرتبطة أولاً
+            $invoice->items()->delete();
+            $invoice->delete();
+
+            Log::info('Invoice deleted successfully', ['invoice_id' => $id]);
 
             return response()->json([
-                'success' => true,
-                'data' => $stats
+                'status' => true,
+                'message' => 'تم حذف الفاتورة بنجاح'
             ]);
+
         } catch (\Exception $e) {
-            Log::error('❌ خطأ في جلب إحصائيات لوحة التحكم: ' . $e->getMessage());
+            Log::error('Error deleting invoice: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'حدث خطأ في حذف الفاتورة'
+            ], 500);
+        }
+    }
+
+    // دالة لتحديث حالة الفاتورة فقط
+    public function updateStatus(Request $request, $id)
+    {
+        try {
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'يجب تسجيل الدخول أولاً'
+                ], 401);
+            }
+
+            if (!$user->hasPermission('edit_invoice')) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'ليس لديك صلاحية لتعديل الفواتير'
+                ], 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'status' => 'required|in:draft,sent,paid,overdue,cancelled'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'خطأ في التحقق',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $invoice = Invoice::find($id);
+
+            if (!$invoice) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'الفاتورة غير موجودة'
+                ], 404);
+            }
+
+            $invoice->update(['status' => $request->status]);
+
+            Log::info('Invoice status updated', [
+                'invoice_id' => $invoice->id,
+                'old_status' => $invoice->getOriginal('status'),
+                'new_status' => $invoice->status
+            ]);
 
             return response()->json([
-                'success' => false,
-                'message' => 'فشل في جلب الإحصائيات'
+                'status' => true,
+                'message' => 'تم تحديث حالة الفاتورة بنجاح',
+                'data' => $invoice
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error updating invoice status: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'حدث خطأ في تحديث حالة الفاتورة'
             ], 500);
         }
     }

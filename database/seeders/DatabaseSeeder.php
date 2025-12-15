@@ -12,8 +12,7 @@ class DatabaseSeeder extends Seeder
             AdminGroupsSeeder::class,
             AdminMenusSeeder::class,
             AdminSubMenusSeeder::class,
-            PermissionsSeeder::class,
-            UserSeeder::class,
+            PermissionSystemSeeder::class
         ]);
     }
 }

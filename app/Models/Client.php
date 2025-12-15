@@ -4,8 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Client extends Model
 {
@@ -18,26 +16,50 @@ class Client extends Model
         'address',
         'company_name',
         'tax_number',
+        'notes',
+        'status',
         'user_id'
     ];
 
     protected $casts = [
-        'email_verified_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime'
     ];
 
     /**
-     * Get the user that owns the client.
+     * العلاقة مع الفواتير
      */
-    public function user(): BelongsTo
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    /**
+     * العلاقة مع المستخدم الذي أضاف العميل
+     */
+    public function user()
     {
         return $this->belongsTo(User::class);
     }
 
     /**
-     * Get the invoices for the client.
+     * Scope للعملاء النشطين
      */
-    public function invoices(): HasMany
+    public function scopeActive($query)
     {
-        return $this->hasMany(Invoice::class);
+        return $query->where('status', 'active');
+    }
+
+    /**
+     * Scope للبحث
+     */
+    public function scopeSearch($query, $search)
+    {
+        return $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('email', 'like', "%{$search}%")
+              ->orWhere('phone', 'like', "%{$search}%")
+              ->orWhere('company_name', 'like', "%{$search}%");
+        });
     }
 }
