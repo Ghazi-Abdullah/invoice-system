@@ -13,7 +13,7 @@ class PermissionSystemSeeder extends Seeder
         // إيقاف فحص المفاتيح الخارجية مؤقتاً
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
 
-        // مسح الجداول
+        // مسح الجداول بالترتيب الصحيح
         DB::table('admin_group_permissions')->truncate();
         DB::table('admin_permissions')->truncate();
         DB::table('admin_sub_menus')->truncate();
@@ -24,98 +24,234 @@ class PermissionSystemSeeder extends Seeder
         // إعادة تفعيل فحص المفاتيح
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
-        // 1. إضافة مجموعات المسؤولين
-        DB::table('admin_groups')->insert([
-            ['id' => 1, 'title_en' => 'Administrator', 'title_ar' => 'مدير', 'is_active' => true],
-            ['id' => 2, 'title_en' => 'Accountant', 'title_ar' => 'محاسب', 'is_active' => true],
-            ['id' => 3, 'title_en' => 'Sales', 'title_ar' => 'مبيعات', 'is_active' => true],
-            ['id' => 4, 'title_en' => 'View Only', 'title_ar' => 'عرض فقط', 'is_active' => true],
-        ]);
+        // 1. إضافة مجموعات المسؤولين مع الحقول الصحيحة
+        $groups = [
+            [
+                'id' => 1,
+                'title_en' => 'Super Admin',
+                'title_ar' => 'مدير عام',
+                'description' => 'System administrator with full access',
+                'is_active' => true,
+                'is_system' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+            [
+                'id' => 2,
+                'title_en' => 'Admin',
+                'title_ar' => 'مدير',
+                'description' => 'Administrator with full access to system features',
+                'is_active' => true,
+                'is_system' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+            [
+                'id' => 3,
+                'title_en' => 'Accountant',
+                'title_ar' => 'محاسب',
+                'description' => 'Can manage invoices, payments, and reports',
+                'is_active' => true,
+                'is_system' => false,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+            [
+                'id' => 4,
+                'title_en' => 'Sales',
+                'title_ar' => 'مبيعات',
+                'description' => 'Can manage clients and create invoices',
+                'is_active' => true,
+                'is_system' => false,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+            [
+                'id' => 5,
+                'title_en' => 'Client',
+                'title_ar' => 'عميل',
+                'description' => 'External client who can view their own invoices',
+                'is_active' => true,
+                'is_system' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+        ];
 
-        // 2. إضافة القوائم الرئيسية
-        DB::table('admin_menus')->insert([
-            ['id' => 1, 'title_en' => 'Dashboard', 'title_ar' => 'لوحة القيادة', 'link' => '/dashboard', 'icon_class' => 'home', 'sort_order' => 1],
-            ['id' => 2, 'title_en' => 'Clients', 'title_ar' => 'العملاء', 'link' => null, 'icon_class' => 'users', 'sort_order' => 2],
-            ['id' => 3, 'title_en' => 'Invoices', 'title_ar' => 'الفواتير', 'link' => null, 'icon_class' => 'file-text', 'sort_order' => 3],
-            ['id' => 4, 'title_en' => 'Reports', 'title_ar' => 'التقارير', 'link' => null, 'icon_class' => 'bar-chart', 'sort_order' => 4],
-            ['id' => 5, 'title_en' => 'Administration', 'title_ar' => 'الإدارة', 'link' => null, 'icon_class' => 'settings', 'sort_order' => 5],
-        ]);
+        DB::table('admin_groups')->insert($groups);
 
-        // 3. إضافة القوائم الفرعية
-        DB::table('admin_sub_menus')->insert([
-            ['id' => 1, 'admin_menu_id' => 2, 'title_en' => 'All Clients', 'title_ar' => 'جميع العملاء', 'link' => '/clients', 'sort_order' => 1],
-            ['id' => 2, 'admin_menu_id' => 2, 'title_en' => 'Add Client', 'title_ar' => 'إضافة عميل', 'link' => '/clients/create', 'sort_order' => 2],
-            ['id' => 3, 'admin_menu_id' => 3, 'title_en' => 'All Invoices', 'title_ar' => 'جميع الفواتير', 'link' => '/invoices', 'sort_order' => 1],
-            ['id' => 4, 'admin_menu_id' => 3, 'title_en' => 'Create Invoice', 'title_ar' => 'إنشاء فاتورة', 'link' => '/invoices/create', 'sort_order' => 2],
-            ['id' => 5, 'admin_menu_id' => 4, 'title_en' => 'Sales Report', 'title_ar' => 'تقرير المبيعات', 'link' => '/reports/sales', 'sort_order' => 1],
-            ['id' => 6, 'admin_menu_id' => 5, 'title_en' => 'User Groups', 'title_ar' => 'مجموعات المستخدمين', 'link' => '/admin/groups', 'sort_order' => 1],
-            ['id' => 7, 'admin_menu_id' => 5, 'title_en' => 'Users', 'title_ar' => 'المستخدمون', 'link' => '/admin/users', 'sort_order' => 2],
-            ['id' => 8, 'admin_menu_id' => 5, 'title_en' => 'Permissions', 'title_ar' => 'الصلاحيات', 'link' => '/admin/permissions', 'sort_order' => 3],
-        ]);
+        // 2. إضافة المستخدمين
+        $users = [
+            [
+                'name' => 'Super Admin',
+                'email' => 'admin@invoice.com',
+                'password' => Hash::make('password123'),
+                'phone' => '+1234567890',
+                'company_name' => 'Invoice System',
+                'admin_group_id' => 1,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+            [
+                'name' => 'Accountant User',
+                'email' => 'accountant@invoice.com',
+                'password' => Hash::make('password123'),
+                'phone' => '+1234567891',
+                'company_name' => 'Accounting Department',
+                'admin_group_id' => 3,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+            [
+                'name' => 'Sales User',
+                'email' => 'sales@invoice.com',
+                'password' => Hash::make('password123'),
+                'phone' => '+1234567892',
+                'company_name' => 'Sales Department',
+                'admin_group_id' => 4,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+        ];
 
-        // 4. إضافة الصلاحيات
+        DB::table('users')->insert($users);
+
+        // 3. إضافة القوائم الرئيسية
+        $menus = [
+            [
+                'id' => 1,
+                'title_en' => 'Dashboard',
+                'title_ar' => 'لوحة التحكم',
+                'link' => '/dashboard',
+                'icon_class' => 'fa-home',
+                'sort_order' => 1,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+            [
+                'id' => 2,
+                'title_en' => 'Invoices',
+                'title_ar' => 'الفواتير',
+                'link' => null,
+                'icon_class' => 'fa-file-invoice',
+                'sort_order' => 2,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+            [
+                'id' => 3,
+                'title_en' => 'Clients',
+                'title_ar' => 'العملاء',
+                'link' => null,
+                'icon_class' => 'fa-users',
+                'sort_order' => 3,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+            [
+                'id' => 4,
+                'title_en' => 'Reports',
+                'title_ar' => 'التقارير',
+                'link' => null,
+                'icon_class' => 'fa-chart-bar',
+                'sort_order' => 4,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+            [
+                'id' => 5,
+                'title_en' => 'Administration',
+                'title_ar' => 'الإدارة',
+                'link' => null,
+                'icon_class' => 'fa-cog',
+                'sort_order' => 5,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ],
+        ];
+
+        DB::table('admin_menus')->insert($menus);
+
+        // 4. إضافة الصلاحيات (مبسطة)
         $permissions = [
-            ['id' => 1, 'admin_menu_id' => 1, 'admin_sub_menu_id' => null, 'parent_id' => 0, 'title' => 'dashboard', 'description_en' => 'View Dashboard', 'description_ar' => 'عرض لوحة التحكم', 'is_parent' => true],
-            ['id' => 2, 'admin_menu_id' => 2, 'admin_sub_menu_id' => 1, 'parent_id' => 0, 'title' => 'clients', 'description_en' => 'View Clients', 'description_ar' => 'عرض العملاء', 'is_parent' => true],
-            ['id' => 3, 'admin_menu_id' => 2, 'admin_sub_menu_id' => 1, 'parent_id' => 2, 'title' => 'view_clients', 'description_en' => 'View All Clients', 'description_ar' => 'عرض جميع العملاء', 'is_parent' => false],
-            ['id' => 4, 'admin_menu_id' => 2, 'admin_sub_menu_id' => 2, 'parent_id' => 2, 'title' => 'create_client', 'description_en' => 'Create Client', 'description_ar' => 'إنشاء عميل', 'is_parent' => false],
-            ['id' => 5, 'admin_menu_id' => 2, 'admin_sub_menu_id' => 1, 'parent_id' => 2, 'title' => 'edit_client', 'description_en' => 'Edit Client', 'description_ar' => 'تعديل عميل', 'is_parent' => false],
-            ['id' => 6, 'admin_menu_id' => 2, 'admin_sub_menu_id' => 1, 'parent_id' => 2, 'title' => 'delete_client', 'description_en' => 'Delete Client', 'description_ar' => 'حذف عميل', 'is_parent' => false],
-            ['id' => 7, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 3, 'parent_id' => 0, 'title' => 'invoices', 'description_en' => 'View Invoices', 'description_ar' => 'عرض الفواتير', 'is_parent' => true],
-            ['id' => 8, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 3, 'parent_id' => 7, 'title' => 'view_invoices', 'description_en' => 'View All Invoices', 'description_ar' => 'عرض جميع الفواتير', 'is_parent' => false],
-            ['id' => 9, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 4, 'parent_id' => 7, 'title' => 'create_invoice', 'description_en' => 'Create Invoice', 'description_ar' => 'إنشاء فاتورة', 'is_parent' => false],
-            ['id' => 10, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 3, 'parent_id' => 7, 'title' => 'edit_invoice', 'description_en' => 'Edit Invoice', 'description_ar' => 'تعديل فاتورة', 'is_parent' => false],
-            ['id' => 11, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 3, 'parent_id' => 7, 'title' => 'delete_invoice', 'description_en' => 'Delete Invoice', 'description_ar' => 'حذف فاتورة', 'is_parent' => false],
-            ['id' => 12, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 3, 'parent_id' => 7, 'title' => 'view_invoice_details', 'description_en' => 'View Invoice Details', 'description_ar' => 'عرض تفاصيل الفاتورة', 'is_parent' => false],
-            ['id' => 13, 'admin_menu_id' => 3, 'admin_sub_menu_id' => 3, 'parent_id' => 7, 'title' => 'print_invoice', 'description_en' => 'Print Invoice', 'description_ar' => 'طباعة الفاتورة', 'is_parent' => false],
-            ['id' => 14, 'admin_menu_id' => 4, 'admin_sub_menu_id' => 5, 'parent_id' => 0, 'title' => 'reports', 'description_en' => 'View Reports', 'description_ar' => 'عرض التقارير', 'is_parent' => true],
-            ['id' => 15, 'admin_menu_id' => 4, 'admin_sub_menu_id' => 5, 'parent_id' => 14, 'title' => 'view_sales_report', 'description_en' => 'View Sales Report', 'description_ar' => 'عرض تقرير المبيعات', 'is_parent' => false],
-            ['id' => 16, 'admin_menu_id' => 4, 'admin_sub_menu_id' => 5, 'parent_id' => 14, 'title' => 'export_reports', 'description_en' => 'Export Reports', 'description_ar' => 'تصدير التقارير', 'is_parent' => false],
-            ['id' => 17, 'admin_menu_id' => 5, 'admin_sub_menu_id' => 6, 'parent_id' => 0, 'title' => 'administration', 'description_en' => 'Administration Access', 'description_ar' => 'الوصول للإدارة', 'is_parent' => true],
-            ['id' => 18, 'admin_menu_id' => 5, 'admin_sub_menu_id' => 6, 'parent_id' => 17, 'title' => 'manage_user_groups', 'description_en' => 'Manage User Groups', 'description_ar' => 'إدارة مجموعات المستخدمين', 'is_parent' => false],
-            ['id' => 19, 'admin_menu_id' => 5, 'admin_sub_menu_id' => 7, 'parent_id' => 17, 'title' => 'manage_users', 'description_en' => 'Manage Users', 'description_ar' => 'إدارة المستخدمين', 'is_parent' => false],
-            ['id' => 20, 'admin_menu_id' => 5, 'admin_sub_menu_id' => 8, 'parent_id' => 17, 'title' => 'manage_permissions', 'description_en' => 'Manage Permissions', 'description_ar' => 'إدارة الصلاحيات', 'is_parent' => false],
+            // Dashboard
+            ['id' => 1, 'title' => 'view_dashboard', 'description_en' => 'View Dashboard', 'description_ar' => 'عرض لوحة التحكم'],
+
+            // Invoices
+            ['id' => 2, 'title' => 'view_invoices', 'description_en' => 'View Invoices', 'description_ar' => 'عرض الفواتير'],
+            ['id' => 3, 'title' => 'create_invoice', 'description_en' => 'Create Invoice', 'description_ar' => 'إنشاء فاتورة'],
+            ['id' => 4, 'title' => 'edit_invoice', 'description_en' => 'Edit Invoice', 'description_ar' => 'تعديل فاتورة'],
+            ['id' => 5, 'title' => 'delete_invoice', 'description_en' => 'Delete Invoice', 'description_ar' => 'حذف فاتورة'],
+
+            // Clients
+            ['id' => 6, 'title' => 'view_clients', 'description_en' => 'View Clients', 'description_ar' => 'عرض العملاء'],
+            ['id' => 7, 'title' => 'create_client', 'description_en' => 'Create Client', 'description_ar' => 'إنشاء عميل'],
+            ['id' => 8, 'title' => 'edit_client', 'description_en' => 'Edit Client', 'description_ar' => 'تعديل عميل'],
+            ['id' => 9, 'title' => 'delete_client', 'description_en' => 'Delete Client', 'description_ar' => 'حذف عميل'],
+
+            // Users
+            ['id' => 10, 'title' => 'view_users', 'description_en' => 'View Users', 'description_ar' => 'عرض المستخدمين'],
+            ['id' => 11, 'title' => 'create_user', 'description_en' => 'Create User', 'description_ar' => 'إنشاء مستخدم'],
+            ['id' => 12, 'title' => 'edit_user', 'description_en' => 'Edit User', 'description_ar' => 'تعديل مستخدم'],
+            ['id' => 13, 'title' => 'delete_user', 'description_en' => 'Delete User', 'description_ar' => 'حذف مستخدم'],
+
+            // Admin Groups
+            ['id' => 14, 'title' => 'view_admin_groups', 'description_en' => 'View Admin Groups', 'description_ar' => 'عرض مجموعات الإدارة'],
+            ['id' => 15, 'title' => 'manage_admin_groups', 'description_en' => 'Manage Admin Groups', 'description_ar' => 'إدارة مجموعات الإدارة'],
+
+            // Reports
+            ['id' => 16, 'title' => 'view_reports', 'description_en' => 'View Reports', 'description_ar' => 'عرض التقارير'],
+            ['id' => 17, 'title' => 'export_reports', 'description_en' => 'Export Reports', 'description_ar' => 'تصدير التقارير'],
+
+            // Permissions
+            ['id' => 18, 'title' => 'manage_permissions', 'description_en' => 'Manage Permissions', 'description_ar' => 'إدارة الصلاحيات'],
         ];
 
         foreach ($permissions as $permission) {
-            DB::table('admin_permissions')->insert($permission);
+            DB::table('admin_permissions')->insert(array_merge($permission, [
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]));
         }
 
-        // 5. إضافة المستخدمين
-        $users = [
-            ['name' => 'Admin', 'email' => 'admin@invoice.com', 'password' => Hash::make('password'), 'admin_group_id' => 1, 'is_active' => true],
-            ['name' => 'Accountant', 'email' => 'accountant@invoice.com', 'password' => Hash::make('password'), 'admin_group_id' => 2, 'is_active' => true],
-            ['name' => 'Sales', 'email' => 'sales@invoice.com', 'password' => Hash::make('password'), 'admin_group_id' => 3, 'is_active' => true],
-        ];
-
-        foreach ($users as $user) {
-            DB::table('users')->insert($user);
-        }
-
-        // 6. تعيين الصلاحيات للمجموعات
-        // Administrator has all permissions
-        for ($i = 1; $i <= 20; $i++) {
+        // 5. تعيين جميع الصلاحيات لـ Super Admin (ID: 1)
+        foreach ($permissions as $permission) {
             DB::table('admin_group_permissions')->insert([
                 'admin_group_id' => 1,
-                'admin_permission_id' => $i
+                'admin_permission_id' => $permission['id'],
+                'created_at' => now(),
+                'updated_at' => now()
             ]);
         }
 
-        // Accountant permissions
-        $accountantPermissions = [1, 2, 3, 7, 8, 12, 13, 14, 15, 16];
+        // 6. تعيين صلاحيات المحاسب (ID: 3)
+        $accountantPermissions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 16, 17];
         foreach ($accountantPermissions as $permissionId) {
             DB::table('admin_group_permissions')->insert([
-                'admin_group_id' => 2,
-                'admin_permission_id' => $permissionId
+                'admin_group_id' => 3,
+                'admin_permission_id' => $permissionId,
+                'created_at' => now(),
+                'updated_at' => now()
             ]);
         }
 
-        // Sales permissions
-        $salesPermissions = [1, 2, 3, 4, 5, 7, 8, 9, 10, 12, 13];
+        // 7. تعيين صلاحيات المبيعات (ID: 4)
+        $salesPermissions = [1, 2, 3, 6, 7, 8, 9];
         foreach ($salesPermissions as $permissionId) {
             DB::table('admin_group_permissions')->insert([
-                'admin_group_id' => 3,
-                'admin_permission_id' => $permissionId
+                'admin_group_id' => 4,
+                'admin_permission_id' => $permissionId,
+                'created_at' => now(),
+                'updated_at' => now()
             ]);
         }
     }

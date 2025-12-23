@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Constants\Constants;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
@@ -15,8 +17,14 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'phone',
+        'address',
+        'company_name',
+        'tax_number',
+        'is_active',
         'admin_group_id',
-        'is_active'
+        'email_verified_at',
+        'remember_token'
     ];
 
     protected $hidden = [
@@ -26,98 +34,83 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-        'is_active' => 'boolean'
+        'is_active' => 'boolean',
     ];
 
-    /**
-     * العلاقة مع مجموعة الإدارة
-     */
-    public function group()
+    // Scopes
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', Constants::ACTIVE);
+    }
+
+    public function scopeClients($query)
+    {
+        return $query->where('admin_group_id', Constants::CLIENT_GROUP_ID);
+    }
+
+    public function scopeStaff($query)
+    {
+        return $query->where('admin_group_id', '!=', Constants::CLIENT_GROUP_ID);
+    }
+
+    // Relations
+    public function adminGroup()
     {
         return $this->belongsTo(AdminGroup::class, 'admin_group_id');
     }
 
-    /**
-     * الحصول على جميع صلاحيات المستخدم من مجموعته
-     */
-    public function getPermissionsAttribute()
+    public function invoices()
     {
-        if (!$this->group) {
-            return collect();
-        }
-
-        // تحميل صلاحيات المجموعة إذا لم تكن محملة
-        if (!$this->group->relationLoaded('permissions')) {
-            $this->group->load('permissions');
-        }
-
-        return $this->group->permissions->pluck('title');
+        return $this->hasMany(Invoice::class, 'user_id');
     }
 
-    /**
-     * التحقق مما إذا كان المستخدم لديه صلاحية معينة
-     */
+    public function createdInvoices()
+    {
+        return $this->hasMany(Invoice::class, 'created_by');
+    }
+
+    public function activities()
+    {
+        return $this->hasMany(ActivityLog::class, 'user_id');
+    }
+
+    // Methods
+    public function isSuperAdmin()
+    {
+        return $this->admin_group_id === Constants::SUPER_ADMIN_GROUP_ID;
+    }
+
+    public function isAdmin()
+    {
+        return $this->admin_group_id === Constants::ADMIN_GROUP_ID;
+    }
+
+    public function isClient()
+    {
+        return $this->admin_group_id === Constants::CLIENT_GROUP_ID;
+    }
+
+    // تغيير اسم الدالة لتجنب التعارض مع دالة can() الأصلية
     public function hasPermission($permission)
     {
-        // إذا كان المستخدم غير نشط، لا يملك أي صلاحيات
-        if (!$this->is_active) {
-            \Log::warning('User is not active', ['user_id' => $this->id]);
-            return false;
-        }
-
-        // إذا كان المستخدم في المجموعة 1 (مدير) فلديه جميع الصلاحيات
-        if ($this->admin_group_id == 1) {
-            \Log::info('User is admin, has all permissions', ['user_id' => $this->id]);
+        if ($this->isSuperAdmin()) {
             return true;
         }
 
-        // التحقق من صلاحيات المجموعة
-        if (!$this->group) {
-            \Log::warning('User has no group', ['user_id' => $this->id]);
+        $adminGroup = $this->adminGroup;
+        if (!$adminGroup) {
             return false;
         }
 
-        // تحميل العلاقة إذا لم تكن محملة
-        if (!$this->group->relationLoaded('permissions')) {
-            $this->group->load('permissions');
-        }
-
-        $hasPermission = $this->group->permissions->contains('title', $permission);
-
-        \Log::info('Permission check', [
-            'user_id' => $this->id,
-            'permission' => $permission,
-            'has_permission' => $hasPermission,
-            'group_permissions' => $this->group->permissions->pluck('title')->toArray()
-        ]);
-
-        return $hasPermission;
+        return $adminGroup->permissions()
+            ->where('title', $permission)
+            ->exists();
     }
 
-    /**
-     * التحقق مما إذا كان المستخدم لديه أي من الصلاحيات المحددة
-     */
-    public function hasAnyPermission($permissions)
+    // إضافة دالة can() متوافقة مع الوالد
+    public function can($ability, $arguments = [])
     {
-        foreach ($permissions as $permission) {
-            if ($this->hasPermission($permission)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * التحقق مما إذا كان المستخدم لديه جميع الصلاحيات المحددة
-     */
-    public function hasAllPermissions($permissions)
-    {
-        foreach ($permissions as $permission) {
-            if (!$this->hasPermission($permission)) {
-                return false;
-            }
-        }
-        return true;
+        // استخدام نظام الصلاحيات الخاص بنا
+        return $this->hasPermission($ability);
     }
 }

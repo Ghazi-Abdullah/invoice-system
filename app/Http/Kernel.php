@@ -39,6 +39,8 @@ class Kernel extends HttpKernel
         'signed' => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+        'check.sanctum' => \App\Http\Middleware\CheckSanctumToken::class,
+
 
         // إضافة الـ middleware الجديد
         'permission' => \App\Http\Middleware\CheckPermission::class,

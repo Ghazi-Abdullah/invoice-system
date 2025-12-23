@@ -2,43 +2,67 @@
 
 namespace App\Helpers;
 
-use App\Models\Permission;
-use App\Models\AdminGroupPermission;
+use App\Models\User;
+use App\Constants\Constants;
 
 class PermissionHelper
 {
-    public static function checkPermission($permissionTitle)
+    public static function checkPermission($permission)
     {
         $user = auth()->user();
 
-        if (!$user || !$user->admin_group_id) {
+        if (!$user) {
             return false;
         }
 
-        $permission = Permission::where('title', $permissionTitle)->first();
+        // Super admin has all permissions
+        if ($user->admin_group_id === Constants::SUPER_ADMIN_GROUP_ID) {
+            return true;
+        }
 
-        if (!$permission) {
+        // Check if user's admin group has the permission
+        $adminGroup = $user->adminGroup;
+        if (!$adminGroup) {
             return false;
         }
 
-        return AdminGroupPermission::where([
-            'admin_group_id' => $user->admin_group_id,
-            'permission_id' => $permission->id
-        ])->exists();
+        return $adminGroup->permissions()
+            ->where('title', $permission)
+            ->exists();
     }
 
-    public static function getUserPermissions()
+    public static function getPermissions()
     {
         $user = auth()->user();
 
-        if (!$user || !$user->admin_group_id) {
+        if (!$user) {
             return [];
         }
 
-        return $user->group->permissions->pluck('title')->toArray();
+        if ($user->admin_group_id === Constants::SUPER_ADMIN_GROUP_ID) {
+            // Return all permissions for super admin
+            return \App\Models\AdminPermission::where('is_active', 1)
+                ->pluck('title')
+                ->toArray();
+        }
+
+        $adminGroup = $user->adminGroup;
+        if (!$adminGroup) {
+            return [];
+        }
+
+        return $adminGroup->permissions()
+            ->where('is_active', 1)
+            ->pluck('title')
+            ->toArray();
     }
 
-    public static function hasAnyPermission(array $permissions)
+    public static function can($permission)
+    {
+        return self::checkPermission($permission);
+    }
+
+    public static function canAny(array $permissions)
     {
         foreach ($permissions as $permission) {
             if (self::checkPermission($permission)) {
@@ -46,5 +70,15 @@ class PermissionHelper
             }
         }
         return false;
+    }
+
+    public static function canAll(array $permissions)
+    {
+        foreach ($permissions as $permission) {
+            if (!self::checkPermission($permission)) {
+                return false;
+            }
+        }
+        return true;
     }
 }
