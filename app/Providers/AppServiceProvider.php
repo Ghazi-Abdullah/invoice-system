@@ -22,7 +22,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register()
     {
-         $this->app->singleton(InvoiceService::class, function ($app) {
+        $this->app->singleton(InvoiceService::class, function ($app) {
             return new InvoiceService();
         });
 
@@ -38,7 +38,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(PermissionInterface::class, PermissionRepository::class);
     }
 
-     public function boot()
+    public function boot()
     {
         // Register validation rules
         \Validator::extend('valid_currency', function ($attribute, $value, $parameters, $validator) {

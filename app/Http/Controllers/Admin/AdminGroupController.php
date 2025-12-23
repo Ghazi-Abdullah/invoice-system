@@ -187,4 +187,20 @@ class AdminGroupController extends Controller
 
         return $this->failureResponse($data['message'], $data['data']);
     }
+
+    // أضف هذه الدالة الجديدة
+    public function simpleList()
+    {
+        if (!PermissionHelper::checkPermission(Constants::VIEW_ADMIN_GROUPS)) {
+            return $this->failureResponse(__('messages.no_permission'), null, 403);
+        }
+
+        $data = $this->adminGroup->getSimpleList();
+
+        if ($data['status']) {
+            return $this->successResponse($data['message'], $data['data']);
+        }
+
+        return $this->failureResponse($data['message'], $data['data']);
+    }
 }

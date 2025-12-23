@@ -3,10 +3,15 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\PermissionController;
 
-Route::group(['prefix' => 'permissions'], function () {
+// Permissions Routes
+Route::prefix('permissions')->group(function () {
     Route::get('/', [PermissionController::class, 'index']);
-    Route::get('/menus', [PermissionController::class, 'getMenus']);
-    Route::get('/my-permissions', [PermissionController::class, 'getUserPermissions']);
-    Route::get('/groups/{groupId}/permissions', [PermissionController::class, 'getGroupPermissions']);
-    Route::put('/groups/{groupId}/permissions', [PermissionController::class, 'updateGroupPermissions']);
+    Route::post('/', [PermissionController::class, 'store']);
+    Route::get('/all', [PermissionController::class, 'getAll']);
+
+    Route::prefix('{id}')->group(function () {
+        Route::get('/', [PermissionController::class, 'show']);
+        Route::put('/', [PermissionController::class, 'update']);
+        Route::delete('/', [PermissionController::class, 'destroy']);
+    });
 });

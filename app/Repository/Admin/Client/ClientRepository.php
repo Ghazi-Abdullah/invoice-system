@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\ActivityLog;
 use App\Constants\Constants;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ClientRepository implements ClientInterface
 {
@@ -56,8 +57,8 @@ class ClientRepository implements ClientInterface
             ];
 
         } catch (\Exception $e) {
-            \Log::error('ClientRepository index error: ' . $e->getMessage());
-            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            Log::error('ClientRepository index error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
 
             return [
                 'status' => false,
@@ -93,7 +94,7 @@ class ClientRepository implements ClientInterface
             ];
 
         } catch (\Exception $e) {
-            \Log::error('ClientRepository show error: ' . $e->getMessage());
+            Log::error('ClientRepository show error: ' . $e->getMessage());
 
             return [
                 'status' => false,
@@ -150,7 +151,7 @@ class ClientRepository implements ClientInterface
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('ClientRepository store error: ' . $e->getMessage());
+            Log::error('ClientRepository store error: ' . $e->getMessage());
 
             return [
                 'status' => false,
@@ -217,7 +218,7 @@ class ClientRepository implements ClientInterface
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('ClientRepository update error: ' . $e->getMessage());
+            Log::error('ClientRepository update error: ' . $e->getMessage());
 
             return [
                 'status' => false,
@@ -264,7 +265,7 @@ class ClientRepository implements ClientInterface
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('ClientRepository destroy error: ' . $e->getMessage());
+            Log::error('ClientRepository destroy error: ' . $e->getMessage());
 
             return [
                 'status' => false,
@@ -305,7 +306,7 @@ class ClientRepository implements ClientInterface
             ];
 
         } catch (\Exception $e) {
-            \Log::error('ClientRepository getClientStats error: ' . $e->getMessage());
+            Log::error('ClientRepository getClientStats error: ' . $e->getMessage());
 
             return [
                 'status' => false,
@@ -334,7 +335,7 @@ class ClientRepository implements ClientInterface
             ];
 
         } catch (\Exception $e) {
-            \Log::error('ClientRepository searchClients error: ' . $e->getMessage());
+            Log::error('ClientRepository searchClients error: ' . $e->getMessage());
 
             return [
                 'status' => false,
@@ -358,7 +359,7 @@ class ClientRepository implements ClientInterface
             ];
 
         } catch (\Exception $e) {
-            \Log::error('ClientRepository getClientInvoices error: ' . $e->getMessage());
+            Log::error('ClientRepository getClientInvoices error: ' . $e->getMessage());
 
             return [
                 'status' => false,

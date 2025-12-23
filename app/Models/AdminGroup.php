@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Constants\Constants;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
@@ -11,11 +10,12 @@ class AdminGroup extends Model
     use HasFactory;
 
     protected $fillable = [
-        'title_en',       // تغيير من 'name' إلى 'title_en'
-        'title_ar',       // أضف هذا الحقل
+        'title_en',
+        'title_ar',
         'description',
         'is_active',
-        'is_system'
+        'is_system',
+        'created_by'
     ];
 
     protected $casts = [
@@ -23,10 +23,26 @@ class AdminGroup extends Model
         'is_system' => 'boolean',
     ];
 
+    // Relations
+    public function users()
+    {
+        return $this->hasMany(User::class);
+    }
+
+    public function permissions()
+    {
+        return $this->belongsToMany(AdminPermission::class, 'admin_group_permissions');
+    }
+
     // Scopes
     public function scopeActive($query)
     {
-        return $query->where('is_active', Constants::ACTIVE);
+        return $query->where('is_active', true);
+    }
+
+    public function scopeSystem($query)
+    {
+        return $query->where('is_system', true);
     }
 
     public function scopeNonSystem($query)
@@ -34,36 +50,14 @@ class AdminGroup extends Model
         return $query->where('is_system', false);
     }
 
-    // Relations
-    public function users()
+    // Helper methods
+    public function hasPermission($permissionTitle)
     {
-        return $this->hasMany(User::class, 'admin_group_id');
+        return $this->permissions()->where('title', $permissionTitle)->exists();
     }
 
-    public function permissions()
+    public function getPermissionNames()
     {
-        return $this->belongsToMany(
-            AdminPermission::class,
-            'admin_group_permissions',
-            'admin_group_id',
-            'admin_permission_id'
-        )->withTimestamps();
-    }
-
-    // Accessor للحصول على الاسم حسب اللغة
-    public function getNameAttribute()
-    {
-        // يمكن تعديل هذا بناءً على لغة التطبيق
-        return app()->getLocale() === 'ar' ? $this->title_ar : $this->title_en;
-    }
-
-    // Methods
-    public function canDelete()
-    {
-        if ($this->is_system || $this->id === Constants::SUPER_ADMIN_GROUP_ID) {
-            return false;
-        }
-
-        return $this->users()->count() === 0;
+        return $this->permissions()->pluck('title')->toArray();
     }
 }

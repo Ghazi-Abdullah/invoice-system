@@ -10,13 +10,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             PermissionSystemSeeder::class,
-            /*AdminGroupsSeeder::class,
-            AdminMenusSeeder::class,
-            AdminPermissionsSeeder::class,
-            AdminSubMenusSeeder::class,
-            UsersSeeder::class,
-            ClientsSeeder::class,
-            SampleInvoicesSeeder::class,*/
         ]);
     }
 }

@@ -116,4 +116,41 @@ return [
     'inactive_account' => 'حسابك غير نشط',
     'not_admin' => 'هذا الحساب لا يمكنه الوصول إلى لوحة التحكم',
     'unauthenticated' => 'غير مصرح به',
+
+    'no_permission' => 'ليس لديك الصلاحية للقيام بهذا الإجراء',
+    'not_found' => 'السجل غير موجود',
+    'operation_success' => 'تمت العملية بنجاح',
+    'operation_failed' => 'فشلت العملية',
+
+    // Admin Groups
+    'admin_groups_fetched' => 'تم جلب مجموعات الإدارة بنجاح',
+    'admin_group_fetched' => 'تم جلب مجموعة الإدارة بنجاح',
+    'admin_group_created' => 'تم إنشاء مجموعة الإدارة بنجاح',
+    'admin_group_updated' => 'تم تحديث مجموعة الإدارة بنجاح',
+    'admin_group_deleted' => 'تم حذف مجموعة الإدارة بنجاح',
+
+    // Permissions
+    'permissions_required' => 'الصلاحيات مطلوبة',
+    'permissions_array' => 'يجب أن تكون الصلاحيات مصفوفة',
+    'permission_not_found' => 'الصلاحية غير موجودة',
+    'permissions_updated' => 'تم تحديث الصلاحيات بنجاح',
+
+    // Validation
+    'title_en_required' => 'العنوان باللغة الإنجليزية مطلوب',
+    'title_en_unique' => 'العنوان باللغة الإنجليزية موجود مسبقاً',
+    'title_ar_required' => 'العنوان باللغة العربية مطلوب',
+
+    // Invoices
+    'invoices_fetched' => 'تم جلب الفواتير بنجاح',
+    'invoice_fetched' => 'تم جلب الفاتورة بنجاح',
+    'invoice_created' => 'تم إنشاء الفاتورة بنجاح',
+    'invoice_updated' => 'تم تحديث الفاتورة بنجاح',
+    'invoice_deleted' => 'تم حذف الفاتورة بنجاح',
+
+    // Clients
+    'clients_fetched' => 'تم جلب العملاء بنجاح',
+    'client_fetched' => 'تم جلب العميل بنجاح',
+    'client_created' => 'تم إنشاء العميل بنجاح',
+    'client_updated' => 'تم تحديث العميل بنجاح',
+    'client_deleted' => 'تم حذف العميل بنجاح',
 ];
