@@ -3,11 +3,13 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\PermissionController;
 
-// Permissions Routes
 Route::prefix('permissions')->group(function () {
     Route::get('/', [PermissionController::class, 'index']);
     Route::post('/', [PermissionController::class, 'store']);
     Route::get('/all', [PermissionController::class, 'getAll']);
+    Route::get('/menus', [PermissionController::class, 'menus']);
+    Route::get('/with-menus', [PermissionController::class, 'permissionsWithMenus']);
+    Route::get('/parent-permissions', [PermissionController::class, 'parentPermissions']);
 
     Route::prefix('{id}')->group(function () {
         Route::get('/', [PermissionController::class, 'show']);

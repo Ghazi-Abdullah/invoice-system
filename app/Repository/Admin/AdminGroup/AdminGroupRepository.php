@@ -14,7 +14,7 @@ class AdminGroupRepository implements AdminGroupInterface
     public function index($request)
     {
         try {
-            $query = AdminGroup::query();
+            $query = AdminGroup::withCount(['users', 'permissions']);
 
             // Apply search filter
             if ($request->has('search') && !empty($request->search)) {
@@ -64,7 +64,7 @@ class AdminGroupRepository implements AdminGroupInterface
     public function show($id)
     {
         try {
-            $adminGroup = AdminGroup::with(['permissions'])->find($id);
+            $adminGroup = AdminGroup::with(['permissions', 'users'])->withCount(['users', 'permissions'])->find($id);
 
             if (!$adminGroup) {
                 return [
@@ -112,8 +112,7 @@ class AdminGroupRepository implements AdminGroupInterface
                 'title_ar' => $request->title_ar,
                 'description' => $request->description ?? null,
                 'is_active' => $request->is_active ?? true,
-                'is_system' => false, // Only system groups are created via seeders
-                'created_by' => auth()->id() ?? 1
+                'is_system' => false,
             ]);
 
             // Attach permissions if provided
@@ -138,12 +137,13 @@ class AdminGroupRepository implements AdminGroupInterface
             return [
                 'status' => true,
                 'message' => 'Admin group created successfully',
-                'data' => $adminGroup->load('permissions')
+                'data' => $adminGroup->load(['permissions'])
             ];
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('AdminGroupRepository store error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
 
             return [
                 'status' => false,
@@ -209,7 +209,7 @@ class AdminGroupRepository implements AdminGroupInterface
             return [
                 'status' => true,
                 'message' => 'Admin group updated successfully',
-                'data' => $adminGroup->load('permissions')
+                'data' => $adminGroup->load(['permissions'])
             ];
 
         } catch (\Exception $e) {

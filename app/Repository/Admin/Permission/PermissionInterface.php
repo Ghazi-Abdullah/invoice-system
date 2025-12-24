@@ -10,4 +10,6 @@ interface PermissionInterface
     public function update($request, $permission);
     public function destroy($permission);
     public function getAllPermissions();
+    public function getPermissionsWithMenus();
+    public function getParentPermissions();
 }

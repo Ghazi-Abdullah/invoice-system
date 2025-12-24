@@ -6,145 +6,239 @@ use App\Traits\ResponseTrait;
 use App\Http\Controllers\Controller;
 use App\Constants\Constants;
 use App\Helpers\PermissionHelper;
+use App\Repository\Admin\Permission\PermissionInterface;
+use App\Http\Requests\Admin\Permission\StorePermissionRequest;
+use App\Http\Requests\Admin\Permission\UpdatePermissionRequest;
 use App\Models\AdminPermission;
-use App\Models\AdminGroup;
+use App\Models\AdminMenu;
 use Illuminate\Http\Request;
 
 class PermissionController extends Controller
 {
     use ResponseTrait;
 
+    public $permission;
+
+    public function __construct(PermissionInterface $permission)
+    {
+        $this->permission = $permission;
+    }
+
     public function index(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
-        $permissions = AdminPermission::with(['menu', 'subMenu', 'children'])
-            ->orderBy('admin_menu_id')
-            ->orderBy('admin_sub_menu_id')
-            ->orderBy('parent_id')
-            ->orderBy('id')
-            ->get();
+        $data = $this->permission->index($request);
 
-        return $this->successResponse(__('messages.permissions_fetched'), $permissions);
+        if ($data['status']) {
+            return $this->successResponse(
+                __('messages.permissions_fetched'),
+                $data['data']
+            );
+        }
+
+        return $this->failureResponse($data['message'], $data['data']);
     }
 
-    public function getGroupPermissions($groupId)
+    public function show($id)
     {
         if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
-        $group = AdminGroup::with('permissions')->find($groupId);
+        $data = $this->permission->show($id);
 
-        if (!$group) {
-            return $this->failureResponse(__('messages.not_found'), null, 404);
+        if ($data['status']) {
+            return $this->successResponse(
+                __('messages.permission_fetched'),
+                $data['data']
+            );
         }
 
-        $allPermissions = AdminPermission::with(['menu', 'subMenu'])
-            ->orderBy('admin_menu_id')
-            ->orderBy('admin_sub_menu_id')
-            ->orderBy('parent_id')
-            ->orderBy('id')
-            ->get();
-
-        $groupPermissions = $group->permissions->pluck('id')->toArray();
-
-        return $this->successResponse(__('messages.permissions_fetched'), [
-            'permissions' => $allPermissions,
-            'selected_permissions' => $groupPermissions,
-            'group' => $group
-        ]);
+        return $this->failureResponse($data['message'], $data['data']);
     }
 
-    public function updateGroupPermissions(Request $request, $groupId)
+    public function store(StorePermissionRequest $request)
     {
         if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
-        $request->validate([
-            'permissions' => 'required|array',
-            'permissions.*' => 'exists:admin_permissions,id'
-        ]);
+        $data = $this->permission->store($request);
 
-        $group = AdminGroup::find($groupId);
-
-        if (!$group) {
-            return $this->failureResponse(__('messages.not_found'), null, 404);
+        if ($data['status']) {
+            return $this->successResponse(
+                __('messages.permission_created'),
+                $data['data'],
+                Constants::RESPONSE_CREATED
+            );
         }
 
-        // Cannot modify super admin group permissions
-        if ($group->id == Constants::SUPER_ADMIN_GROUP_ID) {
-            return $this->failureResponse(__('messages.cannot_modify_super_admin'), null, 403);
-        }
-
-        $group->permissions()->sync($request->permissions);
-
-        return $this->successResponse(__('messages.permissions_updated'), [
-            'group' => $group->load('permissions')
-        ]);
+        return $this->failureResponse($data['message'], $data['data']);
     }
 
-    public function getMenus()
+    public function update(UpdatePermissionRequest $request, $id)
     {
-        $user = auth()->user();
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
+        }
 
-        if ($user->isSuperAdmin()) {
-            $menus = \App\Models\AdminMenu::with(['subMenus' => function($query) {
+        $data = $this->permission->show($id);
+
+        if (!$data['status']) {
+            return $this->failureResponse($data['message'], $data['data']);
+        }
+
+        $updateData = $this->permission->update($request, $data['data']);
+
+        if ($updateData['status']) {
+            return $this->successResponse(
+                __('messages.permission_updated'),
+                $updateData['data']
+            );
+        }
+
+        return $this->failureResponse($updateData['message'], $updateData['data']);
+    }
+
+    public function destroy($id)
+    {
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
+        }
+
+        $data = $this->permission->show($id);
+
+        if (!$data['status']) {
+            return $this->failureResponse($data['message'], $data['data']);
+        }
+
+        $deleteData = $this->permission->destroy($data['data']);
+
+        if ($deleteData['status']) {
+            return $this->successResponse(
+                __('messages.permission_deleted'),
+                $deleteData['data']
+            );
+        }
+
+        return $this->failureResponse($deleteData['message'], $deleteData['data']);
+    }
+
+    public function getAll()
+    {
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
+        }
+
+        $permissions = AdminPermission::where('is_active', true)
+            ->orderBy('title')
+            ->get(['id', 'title', 'description_en', 'description_ar', 'is_parent', 'admin_menu_id', 'admin_sub_menu_id']);
+
+        return $this->successResponse(
+            __('messages.permissions_fetched'),
+            $permissions
+        );
+    }
+
+    public function menus()
+    {
+        $menus = AdminMenu::with(['subMenus' => function ($query) {
                 $query->where('is_active', 1)->orderBy('sort_order');
             }])
             ->where('is_active', 1)
             ->orderBy('sort_order')
             ->get();
-        } else {
-            // Get user's permissions
-            $permissions = $user->adminGroup->permissions()
-                ->where('is_active', 1)
-                ->pluck('id')
-                ->toArray();
 
-            // Get sub menus that have these permissions
-            $subMenuIds = \App\Models\AdminPermission::whereIn('id', $permissions)
-                ->whereNotNull('admin_sub_menu_id')
-                ->pluck('admin_sub_menu_id')
-                ->unique()
-                ->toArray();
-
-            $menus = \App\Models\AdminMenu::with(['subMenus' => function($query) use ($subMenuIds) {
-                $query->whereIn('id', $subMenuIds)
-                    ->where('is_active', 1)
-                    ->orderBy('sort_order');
-            }])
-            ->whereHas('subMenus', function($query) use ($subMenuIds) {
-                $query->whereIn('id', $subMenuIds)
-                    ->where('is_active', 1);
-            })
-            ->where('is_active', 1)
-            ->orderBy('sort_order')
-            ->get();
-        }
-
-        return $this->successResponse(__('messages.menus_fetched'), $menus);
+        return $this->successResponse(
+            __('messages.menus_fetched'),
+            $menus
+        );
     }
 
-    public function getUserPermissions()
+    public function permissionsWithMenus()
     {
-        $user = auth()->user();
-        $permissions = [];
-
-        if ($user->isSuperAdmin()) {
-            $permissions = AdminPermission::where('is_active', 1)
-                ->pluck('title')
-                ->toArray();
-        } else {
-            $permissions = $user->adminGroup->permissions()
-                ->where('is_active', 1)
-                ->pluck('title')
-                ->toArray();
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
-        return $this->successResponse(__('messages.permissions_fetched'), $permissions);
+        $data = $this->permission->getPermissionsWithMenus();
+
+        if ($data['status']) {
+            return $this->successResponse(
+                __('messages.permissions_fetched'),
+                $data['data']
+            );
+        }
+
+        return $this->failureResponse($data['message'], $data['data']);
+    }
+
+    public function getPermissionsWithMenusInternal()
+    {
+        $permissions = AdminPermission::with(['menu', 'subMenu', 'parent'])
+            ->where('is_active', true)
+            ->orderBy('admin_menu_id')
+            ->orderBy('admin_sub_menu_id')
+            ->orderBy('parent_id')
+            ->orderBy('id')
+            ->get();
+
+        return $this->successResponse(
+            __('messages.permissions_fetched'),
+            $permissions
+        );
+    }
+
+    public function parentPermissions()
+    {
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
+        }
+
+        $data = $this->permission->getParentPermissions();
+
+        if ($data['status']) {
+            return $this->successResponse(
+                __('messages.permissions_fetched'),
+                $data['data']
+            );
+        }
+
+        return $this->failureResponse($data['message'], $data['data']);
     }
 }

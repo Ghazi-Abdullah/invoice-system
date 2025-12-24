@@ -27,7 +27,11 @@ class InvoiceController extends Controller
     public function index(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_INVOICES)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->index($request);
@@ -45,7 +49,11 @@ class InvoiceController extends Controller
     public function show($id)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_INVOICES)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->show($id);
@@ -63,13 +71,21 @@ class InvoiceController extends Controller
     public function store(StoreInvoiceRequest $request)
     {
         if (!PermissionHelper::checkPermission(Constants::CREATE_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->store($request);
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data'], 201);
+            return $this->successResponse(
+                __('messages.invoice_created'),
+                $data['data'],
+                Constants::RESPONSE_CREATED
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -78,7 +94,11 @@ class InvoiceController extends Controller
     public function update(UpdateInvoiceRequest $request, $id)
     {
         if (!PermissionHelper::checkPermission(Constants::EDIT_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->show($id);
@@ -90,7 +110,10 @@ class InvoiceController extends Controller
         $updateData = $this->invoice->update($request, $data['data']);
 
         if ($updateData['status']) {
-            return $this->successResponse($updateData['message'], $updateData['data']);
+            return $this->successResponse(
+                __('messages.invoice_updated'),
+                $updateData['data']
+            );
         }
 
         return $this->failureResponse($updateData['message'], $updateData['data']);
@@ -99,7 +122,11 @@ class InvoiceController extends Controller
     public function destroy($id)
     {
         if (!PermissionHelper::checkPermission(Constants::DELETE_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->show($id);
@@ -111,7 +138,10 @@ class InvoiceController extends Controller
         $deleteData = $this->invoice->destroy($data['data']);
 
         if ($deleteData['status']) {
-            return $this->successResponse($deleteData['message'], $deleteData['data']);
+            return $this->successResponse(
+                __('messages.invoice_deleted'),
+                $deleteData['data']
+            );
         }
 
         return $this->failureResponse($deleteData['message'], $deleteData['data']);
@@ -120,7 +150,11 @@ class InvoiceController extends Controller
     public function send(SendInvoiceRequest $request, $id)
     {
         if (!PermissionHelper::checkPermission(Constants::SEND_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->show($id);
@@ -132,7 +166,10 @@ class InvoiceController extends Controller
         $sendData = $this->invoice->sendInvoice($data['data']);
 
         if ($sendData['status']) {
-            return $this->successResponse($sendData['message'], $sendData['data']);
+            return $this->successResponse(
+                __('messages.invoice_sent'),
+                $sendData['data']
+            );
         }
 
         return $this->failureResponse($sendData['message'], $sendData['data']);
@@ -141,7 +178,11 @@ class InvoiceController extends Controller
     public function markAsPaid(MarkAsPaidRequest $request, $id)
     {
         if (!PermissionHelper::checkPermission(Constants::EDIT_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->show($id);
@@ -153,7 +194,10 @@ class InvoiceController extends Controller
         $paidData = $this->invoice->markAsPaid($data['data']);
 
         if ($paidData['status']) {
-            return $this->successResponse($paidData['message'], $paidData['data']);
+            return $this->successResponse(
+                __('messages.invoice_marked_paid'),
+                $paidData['data']
+            );
         }
 
         return $this->failureResponse($paidData['message'], $paidData['data']);
@@ -162,7 +206,11 @@ class InvoiceController extends Controller
     public function duplicate($id)
     {
         if (!PermissionHelper::checkPermission(Constants::CREATE_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->show($id);
@@ -174,7 +222,10 @@ class InvoiceController extends Controller
         $duplicateData = $this->invoice->duplicate($data['data']);
 
         if ($duplicateData['status']) {
-            return $this->successResponse($duplicateData['message'], $duplicateData['data']);
+            return $this->successResponse(
+                __('messages.invoice_duplicated'),
+                $duplicateData['data']
+            );
         }
 
         return $this->failureResponse($duplicateData['message'], $duplicateData['data']);
@@ -183,7 +234,11 @@ class InvoiceController extends Controller
     public function generatePDF($id)
     {
         if (!PermissionHelper::checkPermission(Constants::DOWNLOAD_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->show($id);
@@ -195,7 +250,10 @@ class InvoiceController extends Controller
         $pdfData = $this->invoice->generatePDF($data['data']);
 
         if ($pdfData['status']) {
-            return $this->successResponse($pdfData['message'], $pdfData['data']);
+            return $this->successResponse(
+                __('messages.pdf_generated'),
+                $pdfData['data']
+            );
         }
 
         return $this->failureResponse($pdfData['message'], $pdfData['data']);
@@ -204,7 +262,11 @@ class InvoiceController extends Controller
     public function downloadPDF($id)
     {
         if (!PermissionHelper::checkPermission(Constants::DOWNLOAD_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->show($id);
@@ -228,13 +290,20 @@ class InvoiceController extends Controller
     public function dashboardStats(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_DASHBOARD)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->getDashboardStats();
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.dashboard_stats_fetched'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -243,14 +312,21 @@ class InvoiceController extends Controller
     public function recentInvoices(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_INVOICES)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $limit = $request->limit ?? 10;
         $data = $this->invoice->getRecentInvoices($limit);
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.recent_invoices_fetched'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -259,13 +335,20 @@ class InvoiceController extends Controller
     public function overdueInvoices(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_INVOICES)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->getOverdueInvoices();
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.overdue_invoices_fetched'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);

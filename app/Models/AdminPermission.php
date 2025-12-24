@@ -63,7 +63,7 @@ class AdminPermission extends Model
         return $this->hasMany(AdminPermission::class, 'parent_id');
     }
 
-    public function adminGroups()
+    public function groups()
     {
         return $this->belongsToMany(
             AdminGroup::class,
@@ -71,5 +71,22 @@ class AdminPermission extends Model
             'admin_permission_id',
             'admin_group_id'
         )->withTimestamps();
+    }
+
+    // إضافة هذه العلاقة لحل المشكلة
+    public function parentPermission()
+    {
+        return $this->belongsTo(AdminPermission::class, 'parent_id');
+    }
+
+    // Helper methods
+    public function getFullTitleAttribute()
+    {
+        return $this->title . ($this->description_en ? " ({$this->description_en})" : '');
+    }
+
+    public function isAssignedToGroup($groupId)
+    {
+        return $this->groups()->where('admin_group_id', $groupId)->exists();
     }
 }

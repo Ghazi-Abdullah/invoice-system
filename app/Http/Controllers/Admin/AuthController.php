@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Models\AdminPermission;
 use App\Constants\Constants;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -26,7 +25,11 @@ class AuthController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return $this->failureResponse($validator->errors()->first(), $validator->errors());
+                return $this->failureResponse(
+                    __('messages.validation_error'),
+                    $validator->errors(),
+                    Constants::RESPONSE_VALIDATION_ERROR
+                );
             }
 
             // Find user by email
@@ -34,17 +37,29 @@ class AuthController extends Controller
 
             // Check if user exists
             if (!$user) {
-                return $this->failureResponse('User not found with this email', null, 401);
+                return $this->failureResponse(
+                    __('messages.user_not_found'),
+                    null,
+                    Constants::RESPONSE_UNAUTHORIZED
+                );
             }
 
             // Check if password is correct
             if (!Hash::check($request->password, $user->password)) {
-                return $this->failureResponse('Incorrect password', null, 401);
+                return $this->failureResponse(
+                    __('messages.incorrect_password'),
+                    null,
+                    Constants::RESPONSE_UNAUTHORIZED
+                );
             }
 
             // Check if user is active
             if (!$user->is_active) {
-                return $this->failureResponse('Account is inactive. Please contact administrator.', null, 403);
+                return $this->failureResponse(
+                    __('messages.inactive_account'),
+                    null,
+                    Constants::RESPONSE_FORBIDDEN
+                );
             }
 
             // Get user permissions
@@ -55,29 +70,36 @@ class AuthController extends Controller
             $token = $user->createToken('invoice-system-token')->plainTextToken;
 
             // Return response
-            return $this->successResponse('Login successful', [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                    'company_name' => $user->company_name,
-                    'admin_group_id' => $user->admin_group_id,
-                    'is_active' => $user->is_active,
-                    'adminGroup' => $user->adminGroup,
-                ],
-                'token' => $token,
-                'token_type' => 'Bearer',
-                'permissions' => $permissions,
-                'is_admin' => $is_admin
-            ]);
+            return $this->successResponse(
+                __('messages.login_success'),
+                [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'phone' => $user->phone,
+                        'company_name' => $user->company_name,
+                        'admin_group_id' => $user->admin_group_id,
+                        'is_active' => $user->is_active,
+                        'adminGroup' => $user->adminGroup,
+                    ],
+                    'token' => $token,
+                    'token_type' => 'Bearer',
+                    'permissions' => $permissions,
+                    'is_admin' => $is_admin
+                ]
+            );
 
         } catch (\Exception $e) {
             Log::error('Login error: ' . $e->getMessage(), [
                 'email' => $request->email,
                 'ip' => $request->ip()
             ]);
-            return $this->failureResponse('Login failed: ' . $e->getMessage(), null, 500);
+            return $this->failureResponse(
+                __('messages.login_failed') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
         }
     }
 
@@ -87,11 +109,15 @@ class AuthController extends Controller
             // Revoke the token that was used to authenticate the current request
             $request->user()->currentAccessToken()->delete();
 
-            return $this->successResponse('Logout successful', null);
+            return $this->successResponse(__('messages.logout_success'), null);
 
         } catch (\Exception $e) {
             Log::error('Logout error: ' . $e->getMessage());
-            return $this->failureResponse('Logout failed: ' . $e->getMessage(), null, 500);
+            return $this->failureResponse(
+                __('messages.logout_success') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
         }
     }
 
@@ -101,7 +127,11 @@ class AuthController extends Controller
             $user = $request->user();
 
             if (!$user) {
-                return $this->failureResponse('User not authenticated', null, 401);
+                return $this->failureResponse(
+                    __('messages.unauthenticated'),
+                    null,
+                    Constants::RESPONSE_UNAUTHORIZED
+                );
             }
 
             // Load relationships
@@ -111,24 +141,31 @@ class AuthController extends Controller
             $permissions = $this->getUserPermissions($user);
             $is_admin = $user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID;
 
-            return $this->successResponse('User retrieved successfully', [
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                    'company_name' => $user->company_name,
-                    'admin_group_id' => $user->admin_group_id,
-                    'is_active' => $user->is_active,
-                    'adminGroup' => $user->adminGroup,
-                ],
-                'permissions' => $permissions,
-                'is_admin' => $is_admin
-            ]);
+            return $this->successResponse(
+                __('messages.user_fetched'),
+                [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'phone' => $user->phone,
+                        'company_name' => $user->company_name,
+                        'admin_group_id' => $user->admin_group_id,
+                        'is_active' => $user->is_active,
+                        'adminGroup' => $user->adminGroup,
+                    ],
+                    'permissions' => $permissions,
+                    'is_admin' => $is_admin
+                ]
+            );
 
         } catch (\Exception $e) {
             Log::error('Me endpoint error: ' . $e->getMessage());
-            return $this->failureResponse('Failed to retrieve user: ' . $e->getMessage(), null, 500);
+            return $this->failureResponse(
+                __('messages.error') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
         }
     }
 
@@ -138,7 +175,11 @@ class AuthController extends Controller
             $user = $request->user();
 
             if (!$user) {
-                return $this->failureResponse('User not authenticated', null, 401);
+                return $this->failureResponse(
+                    __('messages.unauthenticated'),
+                    null,
+                    Constants::RESPONSE_UNAUTHORIZED
+                );
             }
 
             // Revoke current token
@@ -147,14 +188,21 @@ class AuthController extends Controller
             // Create new token
             $token = $user->createToken('invoice-system-token')->plainTextToken;
 
-            return $this->successResponse('Token refreshed successfully', [
-                'token' => $token,
-                'token_type' => 'Bearer'
-            ]);
+            return $this->successResponse(
+                __('messages.token_refreshed'),
+                [
+                    'token' => $token,
+                    'token_type' => 'Bearer'
+                ]
+            );
 
         } catch (\Exception $e) {
             Log::error('Refresh token error: ' . $e->getMessage());
-            return $this->failureResponse('Token refresh failed: ' . $e->getMessage(), null, 500);
+            return $this->failureResponse(
+                __('messages.error') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
         }
     }
 
@@ -166,16 +214,24 @@ class AuthController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return $this->failureResponse('Validation failed', $validator->errors(), 422);
+                return $this->failureResponse(
+                    __('messages.validation_error'),
+                    $validator->errors(),
+                    Constants::RESPONSE_VALIDATION_ERROR
+                );
             }
 
             // TODO: Implement password reset logic
 
-            return $this->successResponse('Password reset instructions sent to your email', null);
+            return $this->successResponse(__('messages.success'), null);
 
         } catch (\Exception $e) {
             Log::error('Forgot password error: ' . $e->getMessage());
-            return $this->failureResponse('Password reset failed: ' . $e->getMessage(), null, 500);
+            return $this->failureResponse(
+                __('messages.error') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
         }
     }
 
@@ -189,16 +245,24 @@ class AuthController extends Controller
             ]);
 
             if ($validator->fails()) {
-                return $this->failureResponse('Validation failed', $validator->errors(), 422);
+                return $this->failureResponse(
+                    __('messages.validation_error'),
+                    $validator->errors(),
+                    Constants::RESPONSE_VALIDATION_ERROR
+                );
             }
 
             // TODO: Implement password reset logic
 
-            return $this->successResponse('Password reset successfully', null);
+            return $this->successResponse(__('messages.password_changed'), null);
 
         } catch (\Exception $e) {
             Log::error('Reset password error: ' . $e->getMessage());
-            return $this->failureResponse('Password reset failed: ' . $e->getMessage(), null, 500);
+            return $this->failureResponse(
+                __('messages.error') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
         }
     }
 

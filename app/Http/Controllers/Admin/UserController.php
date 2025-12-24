@@ -14,6 +14,7 @@ use App\Http\Requests\Admin\User\ChangePasswordRequest;
 use App\Http\Requests\Admin\AdminGroup\StoreAdminGroupRequest;
 use App\Http\Requests\Admin\AdminGroup\UpdateAdminGroupRequest;
 use App\Models\AdminGroup;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class UserController extends Controller
@@ -30,7 +31,11 @@ class UserController extends Controller
     public function index(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_USERS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->user->index($request);
@@ -48,7 +53,11 @@ class UserController extends Controller
     public function show($id)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_USERS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->user->show($id);
@@ -66,13 +75,31 @@ class UserController extends Controller
     public function store(StoreUserRequest $request)
     {
         if (!PermissionHelper::checkPermission(Constants::CREATE_USER)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
+        }
+
+        // التحقق من البريد الإلكتروني المكرر بشكل صريح
+        $existingUser = User::where('email', $request->email)->first();
+        if ($existingUser) {
+            return $this->failureResponse(
+                __('messages.email_already_registered'),
+                null,
+                Constants::RESPONSE_VALIDATION_ERROR
+            );
         }
 
         $data = $this->user->store($request);
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data'], 201);
+            return $this->successResponse(
+                __('messages.user_created'),
+                $data['data'],
+                Constants::RESPONSE_CREATED
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -81,7 +108,11 @@ class UserController extends Controller
     public function update(UpdateUserRequest $request, $id)
     {
         if (!PermissionHelper::checkPermission(Constants::EDIT_USER)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->user->show($id);
@@ -93,7 +124,10 @@ class UserController extends Controller
         $updateData = $this->user->update($request, $data['data']);
 
         if ($updateData['status']) {
-            return $this->successResponse($updateData['message'], $updateData['data']);
+            return $this->successResponse(
+                __('messages.user_updated'),
+                $updateData['data']
+            );
         }
 
         return $this->failureResponse($updateData['message'], $updateData['data']);
@@ -102,7 +136,11 @@ class UserController extends Controller
     public function destroy($id)
     {
         if (!PermissionHelper::checkPermission(Constants::DELETE_USER)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->user->show($id);
@@ -114,7 +152,10 @@ class UserController extends Controller
         $deleteData = $this->user->destroy($data['data']);
 
         if ($deleteData['status']) {
-            return $this->successResponse($deleteData['message'], $deleteData['data']);
+            return $this->successResponse(
+                __('messages.user_deleted'),
+                $deleteData['data']
+            );
         }
 
         return $this->failureResponse($deleteData['message'], $deleteData['data']);
@@ -123,7 +164,11 @@ class UserController extends Controller
     public function updateStatus(Request $request, $id)
     {
         if (!PermissionHelper::checkPermission(Constants::EDIT_USER)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $request->validate([
@@ -139,7 +184,10 @@ class UserController extends Controller
         $statusData = $this->user->updateStatus($data['data'], $request->is_active);
 
         if ($statusData['status']) {
-            return $this->successResponse($statusData['message'], $statusData['data']);
+            return $this->successResponse(
+                __('messages.user_status_updated'),
+                $statusData['data']
+            );
         }
 
         return $this->failureResponse($statusData['message'], $statusData['data']);
@@ -160,7 +208,10 @@ class UserController extends Controller
         $data = $this->user->updateProfile($request);
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.profile_updated'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -171,7 +222,10 @@ class UserController extends Controller
         $data = $this->user->changePassword($request);
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.password_changed'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -180,13 +234,20 @@ class UserController extends Controller
     public function staff(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_USERS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->user->getStaffUsers();
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.staff_users_fetched'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -195,13 +256,20 @@ class UserController extends Controller
     public function clients(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_CLIENTS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->user->getClientUsers();
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.client_users_fetched'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -211,7 +279,11 @@ class UserController extends Controller
     public function adminGroups(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::MANAGE_USER_GROUPS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $query = AdminGroup::withCount('users');
@@ -222,28 +294,46 @@ class UserController extends Controller
 
         $groups = $query->orderBy('id')->get();
 
-        return $this->successResponse(__('messages.admin_groups_fetched'), $groups);
+        return $this->successResponse(
+            __('messages.admin_groups_fetched'),
+            $groups
+        );
     }
 
     public function showAdminGroup($id)
     {
         if (!PermissionHelper::checkPermission(Constants::MANAGE_USER_GROUPS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $group = AdminGroup::with(['permissions', 'users'])->find($id);
 
         if (!$group) {
-            return $this->failureResponse(__('messages.not_found'), null, 404);
+            return $this->failureResponse(
+                __('messages.not_found'),
+                null,
+                Constants::RESPONSE_NOT_FOUND
+            );
         }
 
-        return $this->successResponse(__('messages.admin_group_fetched'), $group);
+        return $this->successResponse(
+            __('messages.admin_group_fetched'),
+            $group
+        );
     }
 
     public function storeAdminGroup(StoreAdminGroupRequest $request)
     {
         if (!PermissionHelper::checkPermission(Constants::MANAGE_USER_GROUPS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $group = AdminGroup::create([
@@ -254,24 +344,40 @@ class UserController extends Controller
             'is_system' => false
         ]);
 
-        return $this->successResponse(__('messages.admin_group_created'), $group, 201);
+        return $this->successResponse(
+            __('messages.admin_group_created'),
+            $group,
+            Constants::RESPONSE_CREATED
+        );
     }
 
     public function updateAdminGroup(UpdateAdminGroupRequest $request, $id)
     {
         if (!PermissionHelper::checkPermission(Constants::MANAGE_USER_GROUPS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $group = AdminGroup::find($id);
 
         if (!$group) {
-            return $this->failureResponse(__('messages.not_found'), null, 404);
+            return $this->failureResponse(
+                __('messages.not_found'),
+                null,
+                Constants::RESPONSE_NOT_FOUND
+            );
         }
 
         // Cannot update system groups
         if ($group->is_system && $group->id != Constants::SUPER_ADMIN_GROUP_ID) {
-            return $this->failureResponse(__('messages.cannot_update_system_group'), null, 403);
+            return $this->failureResponse(
+                __('messages.cannot_update_system_group'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $group->update([
@@ -281,33 +387,55 @@ class UserController extends Controller
             'is_active' => $request->is_active
         ]);
 
-        return $this->successResponse(__('messages.admin_group_updated'), $group);
+        return $this->successResponse(
+            __('messages.admin_group_updated'),
+            $group
+        );
     }
 
     public function destroyAdminGroup($id)
     {
         if (!PermissionHelper::checkPermission(Constants::MANAGE_USER_GROUPS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $group = AdminGroup::find($id);
 
         if (!$group) {
-            return $this->failureResponse(__('messages.not_found'), null, 404);
+            return $this->failureResponse(
+                __('messages.not_found'),
+                null,
+                Constants::RESPONSE_NOT_FOUND
+            );
         }
 
         // Cannot delete system groups
         if ($group->is_system) {
-            return $this->failureResponse(__('messages.cannot_delete_system_group'), null, 403);
+            return $this->failureResponse(
+                __('messages.cannot_delete_system_group'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         // Check if group has users
         if ($group->users()->count() > 0) {
-            return $this->failureResponse(__('messages.cannot_delete_group_with_users'), null, 400);
+            return $this->failureResponse(
+                __('messages.cannot_delete_group_with_users'),
+                null,
+                Constants::RESPONSE_BAD_REQUEST
+            );
         }
 
         $group->delete();
 
-        return $this->successResponse(__('messages.admin_group_deleted'), null);
+        return $this->successResponse(
+            __('messages.admin_group_deleted'),
+            null
+        );
     }
 }

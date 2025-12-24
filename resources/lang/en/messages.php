@@ -8,6 +8,9 @@ return [
     'no_permission' => 'You do not have permission to perform this action',
     'validation_error' => 'Validation failed',
     'server_error' => 'Internal server error',
+    'operation_success' => 'Operation completed successfully',
+    'operation_failed' => 'Operation failed',
+    'unauthenticated' => 'Unauthenticated',
 
     // Auth Messages
     'login_success' => 'Logged in successfully',
@@ -21,6 +24,9 @@ return [
     'password_invalid' => 'Current password is incorrect',
     'inactive_account' => 'Your account is inactive',
     'not_admin' => 'This account cannot access the admin panel',
+    'user_not_found' => 'User not found',
+    'incorrect_password' => 'Incorrect password',
+    'cannot_modify_super_admin' => 'Cannot modify super admin group',
 
     // Invoice Messages
     'invoices_fetched' => 'Invoices retrieved successfully',
@@ -53,6 +59,7 @@ return [
     'user_status_updated' => 'User status updated successfully',
     'staff_users_fetched' => 'Staff users retrieved successfully',
     'client_users_fetched' => 'Client users retrieved successfully',
+    'email_already_registered' => 'This email is already registered',
 
     // Admin Group Messages
     'admin_groups_fetched' => 'Admin groups retrieved successfully',
@@ -65,7 +72,15 @@ return [
     'available_permissions_fetched' => 'Available permissions retrieved successfully',
     'groups_with_permissions_fetched' => 'Groups with permissions retrieved successfully',
     'cannot_delete_system_group' => 'System groups cannot be deleted',
+    'cannot_update_system_group' => 'System groups cannot be updated',
     'cannot_delete_group_with_users' => 'Cannot delete group with assigned users',
+
+    // Permission Messages
+    'permission_fetched' => 'Permission retrieved successfully',
+    'permission_created' => 'Permission created successfully',
+    'permission_updated' => 'Permission updated successfully',
+    'permission_deleted' => 'Permission deleted successfully',
+    'menus_fetched' => 'Menus retrieved successfully',
 
     // Report Messages
     'invoice_report_fetched' => 'Invoice report retrieved successfully',
@@ -82,10 +97,6 @@ return [
     'recent_invoices_fetched' => 'Recent invoices retrieved successfully',
     'overdue_invoices_fetched' => 'Overdue invoices retrieved successfully',
 
-    // Permission Messages
-    'permissions_fetched' => 'Permissions retrieved successfully',
-    'menus_fetched' => 'Menus retrieved successfully',
-
     // Validation Messages
     'required' => 'The :attribute field is required',
     'email' => 'The :attribute must be a valid email address',
@@ -101,20 +112,15 @@ return [
     'in' => 'The selected :attribute is invalid',
     'boolean' => 'The :attribute field must be true or false',
     'string' => 'The :attribute must be a string',
-
     'failed' => 'These credentials do not match our records.',
     'password' => 'The provided password is incorrect.',
     'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
-    'login_success' => 'Logged in successfully',
-    'login_failed' => 'Invalid credentials',
-    'logout_success' => 'Logged out successfully',
-    'token_refreshed' => 'Token refreshed successfully',
-    'user_fetched' => 'User data retrieved successfully',
-    'profile_fetched' => 'Profile retrieved successfully',
-    'profile_updated' => 'Profile updated successfully',
-    'password_changed' => 'Password changed successfully',
-    'password_invalid' => 'Current password is incorrect',
-    'inactive_account' => 'Your account is inactive',
-    'not_admin' => 'This account cannot access the admin panel',
-    'unauthenticated' => 'Unauthenticated',
+
+    // Admin Groups Validation
+    'permissions_required' => 'Permissions are required',
+    'permissions_array' => 'Permissions must be an array',
+    'permission_not_found' => 'Permission not found',
+    'title_en_required' => 'Title in English is required',
+    'title_en_unique' => 'Title in English already exists',
+    'title_ar_required' => 'Title in Arabic is required',
 ];

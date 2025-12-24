@@ -25,7 +25,11 @@ class ClientController extends Controller
     public function index(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_CLIENTS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->client->index($request);
@@ -43,7 +47,11 @@ class ClientController extends Controller
     public function show($id)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_CLIENTS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->client->show($id);
@@ -61,13 +69,21 @@ class ClientController extends Controller
     public function store(StoreClientRequest $request)
     {
         if (!PermissionHelper::checkPermission(Constants::CREATE_CLIENT)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->client->store($request);
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data'], 201);
+            return $this->successResponse(
+                __('messages.client_created'),
+                $data['data'],
+                Constants::RESPONSE_CREATED
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -76,7 +92,11 @@ class ClientController extends Controller
     public function update(UpdateClientRequest $request, $id)
     {
         if (!PermissionHelper::checkPermission(Constants::EDIT_CLIENT)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->client->show($id);
@@ -88,7 +108,10 @@ class ClientController extends Controller
         $updateData = $this->client->update($request, $data['data']);
 
         if ($updateData['status']) {
-            return $this->successResponse($updateData['message'], $updateData['data']);
+            return $this->successResponse(
+                __('messages.client_updated'),
+                $updateData['data']
+            );
         }
 
         return $this->failureResponse($updateData['message'], $updateData['data']);
@@ -97,7 +120,11 @@ class ClientController extends Controller
     public function destroy($id)
     {
         if (!PermissionHelper::checkPermission(Constants::DELETE_CLIENT)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->client->show($id);
@@ -109,7 +136,10 @@ class ClientController extends Controller
         $deleteData = $this->client->destroy($data['data']);
 
         if ($deleteData['status']) {
-            return $this->successResponse($deleteData['message'], $deleteData['data']);
+            return $this->successResponse(
+                __('messages.client_deleted'),
+                $deleteData['data']
+            );
         }
 
         return $this->failureResponse($deleteData['message'], $deleteData['data']);
@@ -118,7 +148,11 @@ class ClientController extends Controller
     public function stats($id)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_CLIENTS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->client->show($id);
@@ -130,7 +164,10 @@ class ClientController extends Controller
         $statsData = $this->client->getClientStats($data['data']);
 
         if ($statsData['status']) {
-            return $this->successResponse($statsData['message'], $statsData['data']);
+            return $this->successResponse(
+                __('messages.client_stats_fetched'),
+                $statsData['data']
+            );
         }
 
         return $this->failureResponse($statsData['message'], $statsData['data']);
@@ -139,13 +176,20 @@ class ClientController extends Controller
     public function search(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_CLIENTS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->client->searchClients($request);
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.clients_fetched'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -154,7 +198,11 @@ class ClientController extends Controller
     public function invoices($id)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_CLIENTS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->client->show($id);
@@ -166,7 +214,10 @@ class ClientController extends Controller
         $invoicesData = $this->client->getClientInvoices($data['data']);
 
         if ($invoicesData['status']) {
-            return $this->successResponse($invoicesData['message'], $invoicesData['data']);
+            return $this->successResponse(
+                __('messages.client_invoices_fetched'),
+                $invoicesData['data']
+            );
         }
 
         return $this->failureResponse($invoicesData['message'], $invoicesData['data']);

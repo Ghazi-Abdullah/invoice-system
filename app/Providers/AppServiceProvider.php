@@ -29,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ReportService::class, function ($app) {
             return new ReportService();
         });
+
         // Bind Repositories
         $this->app->bind(InvoiceInterface::class, InvoiceRepository::class);
         $this->app->bind(ClientInterface::class, ClientRepository::class);

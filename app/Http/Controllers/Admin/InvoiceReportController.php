@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Traits\ResponseTrait;
 use App\Http\Controllers\Controller;
+use App\Constants\Constants;
+use App\Helpers\PermissionHelper;
 use App\Models\Invoice;
 use App\Models\Client;
 use Illuminate\Http\Request;
@@ -11,15 +14,20 @@ use Illuminate\Support\Facades\Log;
 
 class InvoiceReportController extends Controller
 {
-    public function __construct()
-    {
-        // تعليق مؤقت للصلاحيات حتى يتم تعيين الأدوار
-        // $this->middleware('permission:view_reports')->only(['index', 'clients', 'revenue', 'overdue']);
-    }
+    use ResponseTrait;
 
     public function index(Request $request)
     {
         try {
+            // التحقق من الصلاحية
+            if (!PermissionHelper::checkPermission(Constants::VIEW_REPORTS)) {
+                return $this->failureResponse(
+                    __('messages.no_permission'),
+                    null,
+                    Constants::RESPONSE_FORBIDDEN
+                );
+            }
+
             $userId = $request->user()->id;
 
             $query = Invoice::where('user_id', $userId)
@@ -37,35 +45,51 @@ class InvoiceReportController extends Controller
                 $query->where('status', $request->status);
             }
 
-            $invoices = $query->orderBy('issue_date', 'desc')->paginate(50);
+            $perPage = $request->per_page ?? Constants::DEFAULT_PER_PAGE;
+            $perPage = min($perPage, Constants::MAX_PER_PAGE);
+
+            $invoices = $query->orderBy('issue_date', 'desc')->paginate($perPage);
 
             $stats = [
                 'total_invoices' => $invoices->total(),
                 'total_amount' => $invoices->sum('total_amount'),
-                'total_paid' => $invoices->where('status', 'paid')->sum('total_amount'),
-                'total_due' => $invoices->whereIn('status', ['sent', 'overdue'])->sum('total_amount'),
+                'total_paid' => $invoices->where('status', Constants::INVOICE_STATUS_PAID)->sum('total_amount'),
+                'total_due' => $invoices->whereIn('status', [Constants::INVOICE_STATUS_SENT, Constants::INVOICE_STATUS_OVERDUE])->sum('total_amount'),
             ];
 
-            return response()->json([
-                'success' => true,
-                'data' => [
+            return $this->successResponse(
+                __('messages.invoice_report_fetched'),
+                [
                     'invoices' => $invoices,
                     'stats' => $stats
                 ]
-            ]);
+            );
 
         } catch (\Exception $e) {
-            Log::error('❌ خطأ في جلب تقرير الفواتير: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'فشل في جلب التقرير'
-            ], 500);
+            Log::error('Error fetching invoice report: ' . $e->getMessage(), [
+                'user_id' => $request->user()->id ?? null,
+                'request' => $request->all()
+            ]);
+            return $this->failureResponse(
+                __('messages.error') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
         }
     }
 
     public function clients(Request $request)
     {
         try {
+            // التحقق من الصلاحية
+            if (!PermissionHelper::checkPermission(Constants::VIEW_REPORTS)) {
+                return $this->failureResponse(
+                    __('messages.no_permission'),
+                    null,
+                    Constants::RESPONSE_FORBIDDEN
+                );
+            }
+
             $userId = $request->user()->id;
 
             $clients = Client::where('user_id', $userId)
@@ -81,26 +105,38 @@ class InvoiceReportController extends Controller
                 'active_clients' => $clients->where('invoices_count', '>', 0)->count(),
             ];
 
-            return response()->json([
-                'success' => true,
-                'data' => [
+            return $this->successResponse(
+                __('messages.client_report_fetched'),
+                [
                     'clients' => $clients,
                     'stats' => $stats
                 ]
-            ]);
+            );
 
         } catch (\Exception $e) {
-            Log::error('❌ خطأ في جلب تقرير العملاء: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'فشل في جلب التقرير'
-            ], 500);
+            Log::error('Error fetching client report: ' . $e->getMessage(), [
+                'user_id' => $request->user()->id ?? null
+            ]);
+            return $this->failureResponse(
+                __('messages.error') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
         }
     }
 
     public function revenue(Request $request)
     {
         try {
+            // التحقق من الصلاحية
+            if (!PermissionHelper::checkPermission(Constants::VIEW_REPORTS)) {
+                return $this->failureResponse(
+                    __('messages.no_permission'),
+                    null,
+                    Constants::RESPONSE_FORBIDDEN
+                );
+            }
+
             $userId = $request->user()->id;
 
             // الإيرادات الشهرية
@@ -109,7 +145,7 @@ class InvoiceReportController extends Controller
                     DB::raw('DATE_FORMAT(issue_date, "%Y-%m") as month'),
                     DB::raw('COUNT(*) as invoice_count'),
                     DB::raw('SUM(total_amount) as total_amount'),
-                    DB::raw('SUM(CASE WHEN status = "paid" THEN total_amount ELSE 0 END) as paid_amount')
+                    DB::raw('SUM(CASE WHEN status = "' . Constants::INVOICE_STATUS_PAID . '" THEN total_amount ELSE 0 END) as paid_amount')
                 )
                 ->groupBy('month')
                 ->orderBy('month', 'desc')
@@ -133,31 +169,43 @@ class InvoiceReportController extends Controller
                 'months' => $monthlyRevenue->count(),
             ];
 
-            return response()->json([
-                'success' => true,
-                'data' => [
+            return $this->successResponse(
+                __('messages.monthly_revenue_fetched'),
+                [
                     'monthly_revenue' => $monthlyRevenue,
                     'status_revenue' => $statusRevenue,
                     'stats' => $stats
                 ]
-            ]);
+            );
 
         } catch (\Exception $e) {
-            Log::error('❌ خطأ في جلب تقرير الإيرادات: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'فشل في جلب التقرير'
-            ], 500);
+            Log::error('Error fetching revenue report: ' . $e->getMessage(), [
+                'user_id' => $request->user()->id ?? null
+            ]);
+            return $this->failureResponse(
+                __('messages.error') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
         }
     }
 
     public function overdue(Request $request)
     {
         try {
+            // التحقق من الصلاحية
+            if (!PermissionHelper::checkPermission(Constants::VIEW_REPORTS)) {
+                return $this->failureResponse(
+                    __('messages.no_permission'),
+                    null,
+                    Constants::RESPONSE_FORBIDDEN
+                );
+            }
+
             $userId = $request->user()->id;
 
             $overdueInvoices = Invoice::where('user_id', $userId)
-                ->whereIn('status', ['sent', 'overdue'])
+                ->whereIn('status', [Constants::INVOICE_STATUS_SENT, Constants::INVOICE_STATUS_OVERDUE])
                 ->where('due_date', '<', now())
                 ->with(['client'])
                 ->orderBy('due_date')
@@ -171,20 +219,23 @@ class InvoiceReportController extends Controller
                 ),
             ];
 
-            return response()->json([
-                'success' => true,
-                'data' => [
+            return $this->successResponse(
+                __('messages.overdue_invoices_fetched'),
+                [
                     'invoices' => $overdueInvoices,
                     'stats' => $stats
                 ]
-            ]);
+            );
 
         } catch (\Exception $e) {
-            Log::error('❌ خطأ في جلب تقرير الفواتير المتأخرة: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'فشل في جلب التقرير'
-            ], 500);
+            Log::error('Error fetching overdue report: ' . $e->getMessage(), [
+                'user_id' => $request->user()->id ?? null
+            ]);
+            return $this->failureResponse(
+                __('messages.error') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
         }
     }
 }

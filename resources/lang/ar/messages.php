@@ -8,6 +8,9 @@ return [
     'no_permission' => 'ليس لديك صلاحية للقيام بهذا الإجراء',
     'validation_error' => 'فشل التحقق',
     'server_error' => 'خطأ في الخادم الداخلي',
+    'operation_success' => 'تمت العملية بنجاح',
+    'operation_failed' => 'فشلت العملية',
+    'unauthenticated' => 'غير مصرح به',
 
     // Auth Messages
     'login_success' => 'تم تسجيل الدخول بنجاح',
@@ -21,6 +24,9 @@ return [
     'password_invalid' => 'كلمة المرور الحالية غير صحيحة',
     'inactive_account' => 'حسابك غير نشط',
     'not_admin' => 'هذا الحساب لا يمكنه الوصول إلى لوحة التحكم',
+    'user_not_found' => 'المستخدم غير موجود',
+    'incorrect_password' => 'كلمة المرور غير صحيحة',
+    'cannot_modify_super_admin' => 'لا يمكن تعديل مجموعة السوبر أدمن',
 
     // Invoice Messages
     'invoices_fetched' => 'تم استرجاع الفواتير بنجاح',
@@ -53,6 +59,7 @@ return [
     'user_status_updated' => 'تم تحديث حالة المستخدم بنجاح',
     'staff_users_fetched' => 'تم استرجاع مستخدمي الموظفين بنجاح',
     'client_users_fetched' => 'تم استرجاع مستخدمي العملاء بنجاح',
+    'email_already_registered' => 'هذا البريد الإلكتروني مسجل بالفعل',
 
     // Admin Group Messages
     'admin_groups_fetched' => 'تم استرجاع مجموعات الإدارة بنجاح',
@@ -65,7 +72,15 @@ return [
     'available_permissions_fetched' => 'تم استرجاع الصلاحيات المتاحة بنجاح',
     'groups_with_permissions_fetched' => 'تم استرجاع المجموعات مع الصلاحيات بنجاح',
     'cannot_delete_system_group' => 'لا يمكن حذف المجموعات النظامية',
+    'cannot_update_system_group' => 'لا يمكن تحديث المجموعات النظامية',
     'cannot_delete_group_with_users' => 'لا يمكن حذف مجموعة بها مستخدمين معينين',
+
+    // Permission Messages
+    'permission_fetched' => 'تم استرجاع الصلاحية بنجاح',
+    'permission_created' => 'تم إنشاء الصلاحية بنجاح',
+    'permission_updated' => 'تم تحديث الصلاحية بنجاح',
+    'permission_deleted' => 'تم حذف الصلاحية بنجاح',
+    'menus_fetched' => 'تم استرجاع القوائم بنجاح',
 
     // Report Messages
     'invoice_report_fetched' => 'تم استرجاع تقرير الفواتير بنجاح',
@@ -81,10 +96,6 @@ return [
     'dashboard_stats_fetched' => 'تم استرجاع إحصائيات لوحة التحكم بنجاح',
     'recent_invoices_fetched' => 'تم استرجاع الفواتير الأخيرة بنجاح',
     'overdue_invoices_fetched' => 'تم استرجاع الفواتير المتأخرة بنجاح',
-
-    // Permission Messages
-    'permissions_fetched' => 'تم استرجاع الصلاحيات بنجاح',
-    'menus_fetched' => 'تم استرجاع القوائم بنجاح',
 
     // Validation Messages
     'required' => 'حقل :attribute مطلوب',
@@ -104,53 +115,12 @@ return [
     'failed' => 'بيانات الاعتماد هذه غير متطابقة مع سجلاتنا.',
     'password' => 'كلمة المرور غير صحيحة.',
     'throttle' => 'محاولات تسجيل دخول كثيرة جدًا. يرجى المحاولة مرة أخرى بعد :seconds ثانية.',
-    'login_success' => 'تم تسجيل الدخول بنجاح',
-    'login_failed' => 'بيانات الاعتماد غير صالحة',
-    'logout_success' => 'تم تسجيل الخروج بنجاح',
-    'token_refreshed' => 'تم تحديث الرمز بنجاح',
-    'user_fetched' => 'تم استرجاع بيانات المستخدم بنجاح',
-    'profile_fetched' => 'تم استرجاع الملف الشخصي بنجاح',
-    'profile_updated' => 'تم تحديث الملف الشخصي بنجاح',
-    'password_changed' => 'تم تغيير كلمة المرور بنجاح',
-    'password_invalid' => 'كلمة المرور الحالية غير صحيحة',
-    'inactive_account' => 'حسابك غير نشط',
-    'not_admin' => 'هذا الحساب لا يمكنه الوصول إلى لوحة التحكم',
-    'unauthenticated' => 'غير مصرح به',
 
-    'no_permission' => 'ليس لديك الصلاحية للقيام بهذا الإجراء',
-    'not_found' => 'السجل غير موجود',
-    'operation_success' => 'تمت العملية بنجاح',
-    'operation_failed' => 'فشلت العملية',
-
-    // Admin Groups
-    'admin_groups_fetched' => 'تم جلب مجموعات الإدارة بنجاح',
-    'admin_group_fetched' => 'تم جلب مجموعة الإدارة بنجاح',
-    'admin_group_created' => 'تم إنشاء مجموعة الإدارة بنجاح',
-    'admin_group_updated' => 'تم تحديث مجموعة الإدارة بنجاح',
-    'admin_group_deleted' => 'تم حذف مجموعة الإدارة بنجاح',
-
-    // Permissions
+    // Admin Groups Validation
     'permissions_required' => 'الصلاحيات مطلوبة',
     'permissions_array' => 'يجب أن تكون الصلاحيات مصفوفة',
     'permission_not_found' => 'الصلاحية غير موجودة',
-    'permissions_updated' => 'تم تحديث الصلاحيات بنجاح',
-
-    // Validation
     'title_en_required' => 'العنوان باللغة الإنجليزية مطلوب',
     'title_en_unique' => 'العنوان باللغة الإنجليزية موجود مسبقاً',
     'title_ar_required' => 'العنوان باللغة العربية مطلوب',
-
-    // Invoices
-    'invoices_fetched' => 'تم جلب الفواتير بنجاح',
-    'invoice_fetched' => 'تم جلب الفاتورة بنجاح',
-    'invoice_created' => 'تم إنشاء الفاتورة بنجاح',
-    'invoice_updated' => 'تم تحديث الفاتورة بنجاح',
-    'invoice_deleted' => 'تم حذف الفاتورة بنجاح',
-
-    // Clients
-    'clients_fetched' => 'تم جلب العملاء بنجاح',
-    'client_fetched' => 'تم جلب العميل بنجاح',
-    'client_created' => 'تم إنشاء العميل بنجاح',
-    'client_updated' => 'تم تحديث العميل بنجاح',
-    'client_deleted' => 'تم حذف العميل بنجاح',
 ];

@@ -13,7 +13,9 @@ class PermissionRepository implements PermissionInterface
     public function index($request)
     {
         try {
-            $query = AdminPermission::query();
+            Log::info('Starting permission index method');
+
+            $query = AdminPermission::with(['menu', 'subMenu', 'parent']);
 
             // Apply search filter
             if ($request->has('search') && !empty($request->search)) {
@@ -35,7 +37,15 @@ class PermissionRepository implements PermissionInterface
             $perPage = min($perPage, Constants::MAX_PER_PAGE);
             $perPage = max($perPage, Constants::MIN_PER_PAGE);
 
-            $permissions = $query->orderBy('title')->paginate($perPage);
+            Log::info('Before pagination', ['perPage' => $perPage]);
+
+            $permissions = $query->orderBy('admin_menu_id')
+                ->orderBy('admin_sub_menu_id')
+                ->orderBy('parent_id')
+                ->orderBy('title')
+                ->paginate($perPage);
+
+            Log::info('Permissions retrieved', ['count' => $permissions->count()]);
 
             return [
                 'status' => true,
@@ -45,6 +55,7 @@ class PermissionRepository implements PermissionInterface
 
         } catch (\Exception $e) {
             Log::error('PermissionRepository index error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
 
             return [
                 'status' => false,
@@ -57,7 +68,7 @@ class PermissionRepository implements PermissionInterface
     public function show($id)
     {
         try {
-            $permission = AdminPermission::find($id);
+            $permission = AdminPermission::with(['menu', 'subMenu', 'parent', 'children'])->find($id);
 
             if (!$permission) {
                 return [
@@ -104,8 +115,11 @@ class PermissionRepository implements PermissionInterface
                 'title' => $request->title,
                 'description_en' => $request->description_en ?? null,
                 'description_ar' => $request->description_ar ?? null,
+                'admin_menu_id' => $request->admin_menu_id ?? null,
+                'admin_sub_menu_id' => $request->admin_sub_menu_id ?? null,
+                'parent_id' => $request->parent_id ?? null,
+                'is_parent' => $request->is_parent ?? false,
                 'is_active' => $request->is_active ?? true,
-                'created_by' => auth()->id() ?? 1
             ]);
 
             // Log activity
@@ -162,6 +176,10 @@ class PermissionRepository implements PermissionInterface
                 'title' => $request->title ?? $permission->title,
                 'description_en' => $request->description_en ?? $permission->description_en,
                 'description_ar' => $request->description_ar ?? $permission->description_ar,
+                'admin_menu_id' => $request->admin_menu_id ?? $permission->admin_menu_id,
+                'admin_sub_menu_id' => $request->admin_sub_menu_id ?? $permission->admin_sub_menu_id,
+                'parent_id' => $request->parent_id ?? $permission->parent_id,
+                'is_parent' => $request->has('is_parent') ? (bool)$request->is_parent : $permission->is_parent,
                 'is_active' => $request->has('is_active') ? (bool)$request->is_active : $permission->is_active
             ];
 
@@ -209,6 +227,15 @@ class PermissionRepository implements PermissionInterface
                 return [
                     'status' => false,
                     'message' => 'Cannot delete permission that is assigned to groups',
+                    'data' => null
+                ];
+            }
+
+            // Check if permission has children
+            if ($permission->children()->count() > 0) {
+                return [
+                    'status' => false,
+                    'message' => 'Cannot delete permission that has child permissions',
                     'data' => null
                 ];
             }
@@ -262,6 +289,89 @@ class PermissionRepository implements PermissionInterface
             return [
                 'status' => false,
                 'message' => 'Failed to retrieve all permissions: ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+
+    public function getPermissionsWithMenus()
+    {
+        try {
+            $permissions = AdminPermission::with(['menu', 'subMenu', 'parent'])
+                ->where('is_active', true)
+                ->orderBy('admin_menu_id')
+                ->orderBy('admin_sub_menu_id')
+                ->orderBy('parent_id')
+                ->orderBy('id')
+                ->get();
+
+            // تحويل البيانات لتجنب المشاكل مع القيم null
+            $formattedPermissions = $permissions->map(function ($permission) {
+                return [
+                    'id' => $permission->id,
+                    'title' => $permission->title,
+                    'description_en' => $permission->description_en,
+                    'description_ar' => $permission->description_ar,
+                    'is_parent' => $permission->is_parent,
+                    'is_active' => $permission->is_active,
+                    'admin_menu_id' => $permission->admin_menu_id,
+                    'admin_sub_menu_id' => $permission->admin_sub_menu_id,
+                    'parent_id' => $permission->parent_id,
+                    'menu' => $permission->menu ? [
+                        'id' => $permission->menu->id,
+                        'title_en' => $permission->menu->title_en,
+                        'title_ar' => $permission->menu->title_ar,
+                    ] : null,
+                    'sub_menu' => $permission->subMenu ? [
+                        'id' => $permission->subMenu->id,
+                        'title_en' => $permission->subMenu->title_en,
+                        'title_ar' => $permission->subMenu->title_ar,
+                    ] : null,
+                    'parent_permission' => $permission->parent ? [
+                        'id' => $permission->parent->id,
+                        'title' => $permission->parent->title,
+                    ] : null,
+                ];
+            });
+
+            return [
+                'status' => true,
+                'message' => 'Permissions with menus retrieved successfully',
+                'data' => $formattedPermissions
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('PermissionRepository getPermissionsWithMenus error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+
+            return [
+                'status' => false,
+                'message' => 'Failed to retrieve permissions with menus: ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+
+    public function getParentPermissions()
+    {
+        try {
+            $permissions = AdminPermission::where('is_parent', true)
+                ->where('is_active', true)
+                ->orderBy('title')
+                ->get(['id', 'title', 'description_en', 'description_ar']);
+
+            return [
+                'status' => true,
+                'message' => 'Parent permissions retrieved successfully',
+                'data' => $permissions
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('PermissionRepository getParentPermissions error: ' . $e->getMessage());
+
+            return [
+                'status' => false,
+                'message' => 'Failed to retrieve parent permissions: ' . $e->getMessage(),
                 'data' => null
             ];
         }

@@ -28,7 +28,7 @@ Route::prefix('admin')->middleware(['auth:sanctum'])->group(function () {
     require __DIR__ . '/admin/dashboard.php';
     require __DIR__ . '/admin/reports.php';
     require __DIR__ . '/admin/permissions.php';
-    require __DIR__ . '/admin/admin-groups.php'; // هذا هو الملف الجديد
+    require __DIR__ . '/admin/admin-groups.php';
 
     // Auth routes inside protected group
     Route::post('logout', [\App\Http\Controllers\Admin\AuthController::class, 'logout']);

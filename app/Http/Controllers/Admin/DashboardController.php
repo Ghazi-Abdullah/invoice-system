@@ -36,7 +36,11 @@ class DashboardController extends Controller
     public function stats(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_DASHBOARD)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $invoiceStats = $this->invoice->getDashboardStats();
@@ -49,19 +53,29 @@ class DashboardController extends Controller
             'total_users' => $userStats['status'] ? $userStats['data']->count() : 0,
         ];
 
-        return $this->successResponse(__('messages.dashboard_stats_fetched'), $stats);
+        return $this->successResponse(
+            __('messages.dashboard_stats_fetched'),
+            $stats
+        );
     }
 
     public function recentActivity(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_DASHBOARD)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->report->recentActivity($request);
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.recent_activity_fetched'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -70,14 +84,21 @@ class DashboardController extends Controller
     public function recentInvoices(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_DASHBOARD)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $limit = $request->limit ?? 10;
         $data = $this->invoice->getRecentInvoices($limit);
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.recent_invoices_fetched'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -86,13 +107,20 @@ class DashboardController extends Controller
     public function overdueInvoices(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_DASHBOARD)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->invoice->getOverdueInvoices();
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.overdue_invoices_fetched'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -101,13 +129,20 @@ class DashboardController extends Controller
     public function topClients(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_DASHBOARD)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->report->topClients($request);
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.top_clients_fetched'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -116,13 +151,20 @@ class DashboardController extends Controller
     public function monthlyRevenue(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_DASHBOARD)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->report->monthlyRevenue($request);
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
+            return $this->successResponse(
+                __('messages.monthly_revenue_fetched'),
+                $data['data']
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);

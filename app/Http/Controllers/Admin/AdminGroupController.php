@@ -10,6 +10,8 @@ use App\Repository\Admin\AdminGroup\AdminGroupInterface;
 use App\Http\Requests\Admin\AdminGroup\StoreAdminGroupRequest;
 use App\Http\Requests\Admin\AdminGroup\UpdateAdminGroupRequest;
 use App\Http\Requests\Admin\AdminGroup\UpdatePermissionsRequest;
+use App\Models\AdminGroup;
+use App\Models\AdminPermission;
 use Illuminate\Http\Request;
 
 class AdminGroupController extends Controller
@@ -25,8 +27,12 @@ class AdminGroupController extends Controller
 
     public function index(Request $request)
     {
-        if (!PermissionHelper::checkPermission(Constants::VIEW_ADMIN_GROUPS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_ADMIN_GROUPS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->adminGroup->index($request);
@@ -43,8 +49,12 @@ class AdminGroupController extends Controller
 
     public function show($id)
     {
-        if (!PermissionHelper::checkPermission(Constants::VIEW_ADMIN_GROUPS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_ADMIN_GROUPS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->adminGroup->show($id);
@@ -61,14 +71,22 @@ class AdminGroupController extends Controller
 
     public function store(StoreAdminGroupRequest $request)
     {
-        if (!PermissionHelper::checkPermission(Constants::CREATE_ADMIN_GROUP)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_ADMIN_GROUPS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->adminGroup->store($request);
 
         if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data'], 201);
+            return $this->successResponse(
+                __('messages.admin_group_created'),
+                $data['data'],
+                Constants::RESPONSE_CREATED
+            );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
@@ -76,8 +94,12 @@ class AdminGroupController extends Controller
 
     public function update(UpdateAdminGroupRequest $request, $id)
     {
-        if (!PermissionHelper::checkPermission(Constants::EDIT_ADMIN_GROUP)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_ADMIN_GROUPS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->adminGroup->show($id);
@@ -89,7 +111,10 @@ class AdminGroupController extends Controller
         $updateData = $this->adminGroup->update($request, $data['data']);
 
         if ($updateData['status']) {
-            return $this->successResponse($updateData['message'], $updateData['data']);
+            return $this->successResponse(
+                __('messages.admin_group_updated'),
+                $updateData['data']
+            );
         }
 
         return $this->failureResponse($updateData['message'], $updateData['data']);
@@ -97,8 +122,12 @@ class AdminGroupController extends Controller
 
     public function destroy($id)
     {
-        if (!PermissionHelper::checkPermission(Constants::DELETE_ADMIN_GROUP)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_ADMIN_GROUPS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
         $data = $this->adminGroup->show($id);
@@ -110,97 +139,117 @@ class AdminGroupController extends Controller
         $deleteData = $this->adminGroup->destroy($data['data']);
 
         if ($deleteData['status']) {
-            return $this->successResponse($deleteData['message'], $deleteData['data']);
+            return $this->successResponse(
+                __('messages.admin_group_deleted'),
+                $deleteData['data']
+            );
         }
 
         return $this->failureResponse($deleteData['message'], $deleteData['data']);
     }
 
-    public function permissions($id)
+    public function availablePermissions($id)
     {
-        if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_ADMIN_GROUPS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
-        $data = $this->adminGroup->show($id);
+        $group = AdminGroup::with(['permissions'])->find($id);
 
-        if (!$data['status']) {
-            return $this->failureResponse($data['message'], $data['data']);
+        if (!$group) {
+            return $this->failureResponse(
+                __('messages.not_found'),
+                null,
+                Constants::RESPONSE_NOT_FOUND
+            );
         }
 
-        $permissionsData = $this->adminGroup->getPermissions($data['data']);
+        $permissions = AdminPermission::where('is_active', true)
+            ->orderBy('title')
+            ->get(['id', 'title', 'description_en', 'description_ar', 'is_parent', 'admin_menu_id', 'admin_sub_menu_id']);
 
-        if ($permissionsData['status']) {
-            return $this->successResponse($permissionsData['message'], $permissionsData['data']);
-        }
+        $groupPermissionIds = $group->permissions->pluck('id')->toArray();
 
-        return $this->failureResponse($permissionsData['message'], $permissionsData['data']);
+        return $this->successResponse(
+            __('messages.permissions_fetched'),
+            [
+                'permissions' => $permissions,
+                'selected_permissions' => $groupPermissionIds
+            ]
+        );
     }
 
     public function updatePermissions(UpdatePermissionsRequest $request, $id)
     {
-        if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_ADMIN_GROUPS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
-        $data = $this->adminGroup->show($id);
+        $group = AdminGroup::find($id);
 
-        if (!$data['status']) {
-            return $this->failureResponse($data['message'], $data['data']);
+        if (!$group) {
+            return $this->failureResponse(
+                __('messages.not_found'),
+                null,
+                Constants::RESPONSE_NOT_FOUND
+            );
         }
 
-        $updateData = $this->adminGroup->updatePermissions($data['data'], $request->permissions);
-
-        if ($updateData['status']) {
-            return $this->successResponse($updateData['message'], $updateData['data']);
+        if ($group->id == Constants::SUPER_ADMIN_GROUP_ID) {
+            return $this->failureResponse(
+                __('messages.cannot_modify_super_admin'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
-        return $this->failureResponse($updateData['message'], $updateData['data']);
+        $group->permissions()->sync($request->permissions);
+
+        return $this->successResponse(
+            __('messages.permissions_updated'),
+            [
+                'group' => $group->load('permissions')
+            ]
+        );
     }
 
-    public function availablePermissions()
+    public function simpleList()
     {
-        if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
-        }
+        $groups = AdminGroup::where('is_active', true)
+            ->orderBy('title_en')
+            ->get(['id', 'title_en', 'title_ar']);
 
-        $data = $this->adminGroup->getAvailablePermissions();
-
-        if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
-        }
-
-        return $this->failureResponse($data['message'], $data['data']);
+        return $this->successResponse(
+            __('messages.admin_groups_fetched'),
+            $groups
+        );
     }
 
     public function groupsWithPermissions()
     {
-        if (!PermissionHelper::checkPermission(Constants::VIEW_ADMIN_GROUPS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_ADMIN_GROUPS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
         }
 
-        $data = $this->adminGroup->getGroupsWithPermissions();
+        $groups = AdminGroup::with(['permissions'])
+            ->orderBy('id')
+            ->get();
 
-        if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
-        }
-
-        return $this->failureResponse($data['message'], $data['data']);
-    }
-
-    // أضف هذه الدالة الجديدة
-    public function simpleList()
-    {
-        if (!PermissionHelper::checkPermission(Constants::VIEW_ADMIN_GROUPS)) {
-            return $this->failureResponse(__('messages.no_permission'), null, 403);
-        }
-
-        $data = $this->adminGroup->getSimpleList();
-
-        if ($data['status']) {
-            return $this->successResponse($data['message'], $data['data']);
-        }
-
-        return $this->failureResponse($data['message'], $data['data']);
+        return $this->successResponse(
+            __('messages.groups_with_permissions_fetched'),
+            $groups
+        );
     }
 }
