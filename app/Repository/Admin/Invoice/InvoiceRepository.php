@@ -50,7 +50,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => true,
-                'message' => 'تم استرجاع الفواتير بنجاح',
+                'message' => __('messages.invoices_fetched'),
                 'data' => $invoices
             ];
 
@@ -60,7 +60,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => false,
-                'message' => 'فشل في استرجاع الفواتير: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -74,14 +74,14 @@ class InvoiceRepository implements InvoiceInterface
             if (!$invoice) {
                 return [
                     'status' => false,
-                    'message' => 'الفاتورة غير موجودة',
+                    'message' => __('messages.not_found'),
                     'data' => null
                 ];
             }
 
             return [
                 'status' => true,
-                'message' => 'تم استرجاع الفاتورة بنجاح',
+                'message' => __('messages.invoice_fetched'),
                 'data' => $invoice
             ];
 
@@ -90,7 +90,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => false,
-                'message' => 'فشل في استرجاع الفاتورة: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -113,7 +113,7 @@ class InvoiceRepository implements InvoiceInterface
             if ($existingInvoice) {
                 return [
                     'status' => false,
-                    'message' => 'رقم الفاتورة موجود مسبقاً',
+                    'message' => __('messages.unique', ['attribute' => 'رقم الفاتورة']),
                     'data' => null
                 ];
             }
@@ -172,7 +172,7 @@ class InvoiceRepository implements InvoiceInterface
             // تسجيل النشاط
             ActivityLog::log(
                 'CREATE',
-                'Created invoice: ' . $invoice->invoice_number,
+                __('messages.invoice_created') . ': ' . $invoice->invoice_number,
                 $invoice
             );
 
@@ -180,7 +180,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => true,
-                'message' => 'تم إنشاء الفاتورة بنجاح',
+                'message' => __('messages.invoice_created'),
                 'data' => $invoice->load(['client', 'items', 'createdBy'])
             ];
 
@@ -190,7 +190,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => false,
-                'message' => 'فشل في إنشاء الفاتورة: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -212,7 +212,7 @@ class InvoiceRepository implements InvoiceInterface
                 if ($existingInvoice) {
                     return [
                         'status' => false,
-                        'message' => 'رقم الفاتورة موجود مسبقاً',
+                        'message' => __('messages.unique', ['attribute' => 'رقم الفاتورة']),
                         'data' => null
                     ];
                 }
@@ -277,7 +277,7 @@ class InvoiceRepository implements InvoiceInterface
             // تسجيل النشاط
             ActivityLog::log(
                 'UPDATE',
-                'Updated invoice: ' . $invoice->invoice_number,
+                __('messages.invoice_updated') . ': ' . $invoice->invoice_number,
                 $invoice,
                 $oldValues,
                 $invoice->fresh()->toArray()
@@ -287,7 +287,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => true,
-                'message' => 'تم تحديث الفاتورة بنجاح',
+                'message' => __('messages.invoice_updated'),
                 'data' => $invoice->load(['client', 'items', 'createdBy'])
             ];
 
@@ -297,7 +297,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => false,
-                'message' => 'فشل في تحديث الفاتورة: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -314,7 +314,7 @@ class InvoiceRepository implements InvoiceInterface
             // تسجيل النشاط قبل الحذف
             ActivityLog::log(
                 'DELETE',
-                'Deleted invoice: ' . $invoiceNumber,
+                __('messages.invoice_deleted') . ': ' . $invoiceNumber,
                 $invoice
             );
 
@@ -328,7 +328,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => true,
-                'message' => 'تم حذف الفاتورة بنجاح',
+                'message' => __('messages.invoice_deleted'),
                 'data' => ['id' => $invoiceId]
             ];
 
@@ -338,7 +338,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => false,
-                'message' => 'فشل في حذف الفاتورة: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -351,13 +351,13 @@ class InvoiceRepository implements InvoiceInterface
 
             ActivityLog::log(
                 'UPDATE',
-                'Sent invoice: ' . $invoice->invoice_number,
+                __('messages.invoice_sent') . ': ' . $invoice->invoice_number,
                 $invoice
             );
 
             return [
                 'status' => true,
-                'message' => 'تم إرسال الفاتورة بنجاح',
+                'message' => __('messages.invoice_sent'),
                 'data' => $invoice->load(['client', 'items', 'createdBy'])
             ];
 
@@ -366,7 +366,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => false,
-                'message' => 'فشل في إرسال الفاتورة: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -379,13 +379,13 @@ class InvoiceRepository implements InvoiceInterface
 
             ActivityLog::log(
                 'UPDATE',
-                'Marked invoice as paid: ' . $invoice->invoice_number,
+                __('messages.invoice_marked_paid') . ': ' . $invoice->invoice_number,
                 $invoice
             );
 
             return [
                 'status' => true,
-                'message' => 'تم تعليم الفاتورة كمدفوعة بنجاح',
+                'message' => __('messages.invoice_marked_paid'),
                 'data' => $invoice->load(['client', 'items', 'createdBy'])
             ];
 
@@ -394,7 +394,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => false,
-                'message' => 'فشل في تعليم الفاتورة كمدفوعة: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -424,7 +424,7 @@ class InvoiceRepository implements InvoiceInterface
             // تسجيل النشاط
             ActivityLog::log(
                 'CREATE',
-                'Duplicated invoice: ' . $invoice->invoice_number . ' to ' . $newInvoice->invoice_number,
+                __('messages.invoice_duplicated') . ': ' . $invoice->invoice_number . ' to ' . $newInvoice->invoice_number,
                 $newInvoice
             );
 
@@ -432,7 +432,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => true,
-                'message' => 'تم نسخ الفاتورة بنجاح',
+                'message' => __('messages.invoice_duplicated'),
                 'data' => $newInvoice->load(['client', 'items', 'createdBy'])
             ];
 
@@ -442,7 +442,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => false,
-                'message' => 'فشل في نسخ الفاتورة: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -457,7 +457,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => true,
-                'message' => 'تم إنشاء ملف PDF',
+                'message' => __('messages.pdf_generated'),
                 'data' => [
                     'file_path' => $filePath,
                     'file_name' => 'invoice_' . $invoice->invoice_number . '.pdf'
@@ -469,7 +469,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => false,
-                'message' => 'فشل في إنشاء ملف PDF: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -497,7 +497,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => true,
-                'message' => 'تم استرجاع إحصائيات لوحة التحكم',
+                'message' => __('messages.dashboard_stats_fetched'),
                 'data' => $stats
             ];
 
@@ -506,7 +506,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => false,
-                'message' => 'فشل في استرجاع الإحصائيات: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -522,7 +522,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => true,
-                'message' => 'تم استرجاع الفواتير الأخيرة',
+                'message' => __('messages.recent_invoices_fetched'),
                 'data' => $invoices
             ];
 
@@ -531,7 +531,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => false,
-                'message' => 'فشل في استرجاع الفواتير الأخيرة: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -551,7 +551,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => true,
-                'message' => 'تم استرجاع الفواتير المتأخرة',
+                'message' => __('messages.overdue_invoices_fetched'),
                 'data' => $invoices
             ];
 
@@ -560,7 +560,7 @@ class InvoiceRepository implements InvoiceInterface
 
             return [
                 'status' => false,
-                'message' => 'فشل في استرجاع الفواتير المتأخرة: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }

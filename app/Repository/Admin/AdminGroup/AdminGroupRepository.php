@@ -45,7 +45,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => true,
-                'message' => 'Admin groups retrieved successfully',
+                'message' => __('messages.admin_groups_fetched'),
                 'data' => $adminGroups
             ];
 
@@ -55,7 +55,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve admin groups: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -69,14 +69,14 @@ class AdminGroupRepository implements AdminGroupInterface
             if (!$adminGroup) {
                 return [
                     'status' => false,
-                    'message' => 'Admin group not found',
+                    'message' => __('messages.admin_group_not_found'),
                     'data' => null
                 ];
             }
 
             return [
                 'status' => true,
-                'message' => 'Admin group retrieved successfully',
+                'message' => __('messages.admin_group_fetched'),
                 'data' => $adminGroup
             ];
 
@@ -85,7 +85,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve admin group: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -101,7 +101,7 @@ class AdminGroupRepository implements AdminGroupInterface
             if ($existingGroup) {
                 return [
                     'status' => false,
-                    'message' => 'Admin group with this English title already exists',
+                    'message' => __('messages.title_en_unique'),
                     'data' => null
                 ];
             }
@@ -128,7 +128,7 @@ class AdminGroupRepository implements AdminGroupInterface
             // Log activity
             ActivityLog::log(
                 'CREATE',
-                'Created admin group: ' . $adminGroup->title_en,
+                __('messages.admin_group_created') . ': ' . $adminGroup->title_en,
                 $adminGroup
             );
 
@@ -136,7 +136,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => true,
-                'message' => 'Admin group created successfully',
+                'message' => __('messages.admin_group_created'),
                 'data' => $adminGroup->load(['permissions'])
             ];
 
@@ -147,7 +147,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to create admin group: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -169,7 +169,7 @@ class AdminGroupRepository implements AdminGroupInterface
                 if ($existingGroup) {
                     return [
                         'status' => false,
-                        'message' => 'Admin group with this English title already exists',
+                        'message' => __('messages.title_en_unique'),
                         'data' => null
                     ];
                 }
@@ -198,7 +198,7 @@ class AdminGroupRepository implements AdminGroupInterface
             // Log activity
             ActivityLog::log(
                 'UPDATE',
-                'Updated admin group: ' . $adminGroup->title_en,
+                __('messages.admin_group_updated') . ': ' . $adminGroup->title_en,
                 $adminGroup,
                 $oldValues,
                 $adminGroup->fresh()->toArray()
@@ -208,7 +208,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => true,
-                'message' => 'Admin group updated successfully',
+                'message' => __('messages.admin_group_updated'),
                 'data' => $adminGroup->load(['permissions'])
             ];
 
@@ -218,7 +218,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to update admin group: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -236,7 +236,7 @@ class AdminGroupRepository implements AdminGroupInterface
             if ($adminGroup->is_system) {
                 return [
                     'status' => false,
-                    'message' => 'Cannot delete system admin group',
+                    'message' => __('messages.cannot_delete_system_group'),
                     'data' => null
                 ];
             }
@@ -245,7 +245,7 @@ class AdminGroupRepository implements AdminGroupInterface
             if ($adminGroup->users()->count() > 0) {
                 return [
                     'status' => false,
-                    'message' => 'Cannot delete admin group with assigned users',
+                    'message' => __('messages.cannot_delete_group_with_users'),
                     'data' => null
                 ];
             }
@@ -253,7 +253,7 @@ class AdminGroupRepository implements AdminGroupInterface
             // Log activity before deletion
             ActivityLog::log(
                 'DELETE',
-                'Deleted admin group: ' . $groupName,
+                __('messages.admin_group_deleted') . ': ' . $groupName,
                 $adminGroup
             );
 
@@ -267,7 +267,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => true,
-                'message' => 'Admin group deleted successfully',
+                'message' => __('messages.admin_group_deleted'),
                 'data' => ['id' => $groupId]
             ];
 
@@ -277,7 +277,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to delete admin group: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -290,7 +290,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => true,
-                'message' => 'Permissions retrieved successfully',
+                'message' => __('messages.permissions_fetched'),
                 'data' => $permissions
             ];
 
@@ -299,7 +299,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve permissions: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -319,7 +319,7 @@ class AdminGroupRepository implements AdminGroupInterface
             if (count($validPermissions) !== count($permissions)) {
                 return [
                     'status' => false,
-                    'message' => 'Some permissions are invalid',
+                    'message' => __('messages.permission_not_found'),
                     'data' => null
                 ];
             }
@@ -330,7 +330,7 @@ class AdminGroupRepository implements AdminGroupInterface
             // Log activity
             ActivityLog::log(
                 'UPDATE',
-                'Updated permissions for admin group: ' . $adminGroup->title_en,
+                __('messages.permissions_updated') . ': ' . $adminGroup->title_en,
                 $adminGroup
             );
 
@@ -338,7 +338,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => true,
-                'message' => 'Permissions updated successfully',
+                'message' => __('messages.permissions_updated'),
                 'data' => $adminGroup->load('permissions')
             ];
 
@@ -348,7 +348,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to update permissions: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -363,7 +363,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => true,
-                'message' => 'Available permissions retrieved successfully',
+                'message' => __('messages.available_permissions_fetched'),
                 'data' => $permissions
             ];
 
@@ -372,7 +372,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve available permissions: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -389,7 +389,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => true,
-                'message' => 'Groups with permissions retrieved successfully',
+                'message' => __('messages.groups_with_permissions_fetched'),
                 'data' => $groups
             ];
 
@@ -398,7 +398,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve groups with permissions: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -413,7 +413,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => true,
-                'message' => 'Admin groups list retrieved successfully',
+                'message' => __('messages.admin_groups_fetched'),
                 'data' => $groups
             ];
 
@@ -422,7 +422,7 @@ class AdminGroupRepository implements AdminGroupInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve admin groups list: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }

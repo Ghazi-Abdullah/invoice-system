@@ -1,11 +1,12 @@
 <?php
-// app/Repository/User/Report/ReportRepository.php
+
 namespace App\Repository\User\Report;
 
 use App\Models\Invoice;
 use App\Models\Client;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Constants\Constants;
 
 class ReportRepository implements ReportInterface
 {
@@ -33,8 +34,8 @@ class ReportRepository implements ReportInterface
         $stats = [
             'total_invoices' => $invoices->total(),
             'total_amount' => $invoices->sum('total_amount'),
-            'total_paid' => $invoices->where('status', 'paid')->sum('total_amount'),
-            'total_due' => $invoices->whereIn('status', ['sent', 'overdue'])->sum('total_amount'),
+            'total_paid' => $invoices->where('status', Constants::INVOICE_STATUS_PAID)->sum('total_amount'),
+            'total_due' => $invoices->whereIn('status', [Constants::INVOICE_STATUS_SENT, Constants::INVOICE_STATUS_OVERDUE])->sum('total_amount'),
         ];
 
         return [
@@ -73,9 +74,12 @@ class ReportRepository implements ReportInterface
         $totalClients = Client::where('user_id', $user->id)->count();
         $totalInvoices = Invoice::where('user_id', $user->id)->count();
         $totalAmount = Invoice::where('user_id', $user->id)->sum('total_amount');
-        $paidInvoices = Invoice::where('user_id', $user->id)->where('status', 'paid')->count();
-        $paidAmount = Invoice::where('user_id', $user->id)->where('status', 'paid')->sum('total_amount');
-        $overdueInvoices = Invoice::where('user_id', $user->id)->where('status', 'overdue')->count();
+        $paidInvoices = Invoice::where('user_id', $user->id)
+            ->where('status', Constants::INVOICE_STATUS_PAID)->count();
+        $paidAmount = Invoice::where('user_id', $user->id)
+            ->where('status', Constants::INVOICE_STATUS_PAID)->sum('total_amount');
+        $overdueInvoices = Invoice::where('user_id', $user->id)
+            ->where('status', Constants::INVOICE_STATUS_OVERDUE)->count();
 
         // هذا الشهر
         $startOfMonth = now()->startOfMonth();

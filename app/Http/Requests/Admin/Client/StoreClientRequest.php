@@ -31,15 +31,7 @@ class StoreClientRequest extends FormRequest
         ];
     }
 
-    public function messages()
-    {
-        return [
-            'name.required' => 'Client name is required',
-            'email.required' => 'Email is required',
-            'email.email' => 'Please enter a valid email',
-            'email.unique' => 'This email is already registered',
-        ];
-    }
+    // ⬇️ تم حذف دالة messages() بالكامل
 
     protected function failedValidation(Validator $validator)
     {

@@ -1,5 +1,5 @@
 <?php
-// app/Repository/Admin/User/UserRepository.php
+
 namespace App\Repository\User\User;
 
 use App\Models\User;
@@ -7,14 +7,15 @@ use App\Models\AdminGroup;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use App\Constants\Constants;
 
 class UserRepository implements UserInterface
 {
     public function index()
     {
         $user = Auth::user();
-        if (!$user->hasPermission('view_users')) {
-            throw new \Exception('ليس لديك صلاحية لعرض المستخدمين');
+        if (!$user->hasPermission(Constants::VIEW_USERS)) {
+            throw new \Exception(__('messages.no_permission'));
         }
 
         return User::with(['group', 'permissions'])
@@ -25,8 +26,8 @@ class UserRepository implements UserInterface
     public function show(User $user)
     {
         $authUser = Auth::user();
-        if (!$authUser->hasPermission('view_users')) {
-            throw new \Exception('ليس لديك صلاحية لعرض المستخدمين');
+        if (!$authUser->hasPermission(Constants::VIEW_USERS)) {
+            throw new \Exception(__('messages.no_permission'));
         }
 
         return $user->load(['group', 'permissions']);
@@ -35,8 +36,8 @@ class UserRepository implements UserInterface
     public function store($request)
     {
         $authUser = Auth::user();
-        if (!$authUser->hasPermission('create_user')) {
-            throw new \Exception('ليس لديك صلاحية لإضافة مستخدمين');
+        if (!$authUser->hasPermission(Constants::CREATE_USER)) {
+            throw new \Exception(__('messages.no_permission'));
         }
 
         $data = $request->validated();
@@ -59,8 +60,8 @@ class UserRepository implements UserInterface
     public function update($request, User $user)
     {
         $authUser = Auth::user();
-        if (!$authUser->hasPermission('edit_user')) {
-            throw new \Exception('ليس لديك صلاحية لتعديل المستخدمين');
+        if (!$authUser->hasPermission(Constants::EDIT_USER)) {
+            throw new \Exception(__('messages.no_permission'));
         }
 
         $data = $request->validated();
@@ -82,18 +83,18 @@ class UserRepository implements UserInterface
     public function destroy(User $user)
     {
         $authUser = Auth::user();
-        if (!$authUser->hasPermission('delete_user')) {
-            throw new \Exception('ليس لديك صلاحية لحذف المستخدمين');
+        if (!$authUser->hasPermission(Constants::DELETE_USER)) {
+            throw new \Exception(__('messages.no_permission'));
         }
 
         // منع حذف المستخدم الحالي
         if ($user->id === $authUser->id) {
-            throw new \Exception('لا يمكن حذف حسابك الشخصي');
+            throw new \Exception(__('messages.cannot_delete_own_account'));
         }
 
         // منع حذف مستخدمين لديهم فواتير أو عملاء
         if ($user->invoices()->count() > 0 || $user->clients()->count() > 0) {
-            throw new \Exception('لا يمكن حذف مستخدم لديه فواتير أو عملاء مرتبطين');
+            throw new \Exception(__('messages.user_has_invoices_or_clients'));
         }
 
         $user->delete();
@@ -109,8 +110,8 @@ class UserRepository implements UserInterface
     public function updateStatus(User $user, $status)
     {
         $authUser = Auth::user();
-        if (!$authUser->hasPermission('edit_user')) {
-            throw new \Exception('ليس لديك صلاحية لتعديل المستخدمين');
+        if (!$authUser->hasPermission(Constants::EDIT_USER)) {
+            throw new \Exception(__('messages.no_permission'));
         }
 
         $user->update(['is_active' => $status]);
@@ -121,13 +122,13 @@ class UserRepository implements UserInterface
     public function assignGroup(User $user, $groupId)
     {
         $authUser = Auth::user();
-        if (!$authUser->hasPermission('edit_user')) {
-            throw new \Exception('ليس لديك صلاحية لتعديل المستخدمين');
+        if (!$authUser->hasPermission(Constants::EDIT_USER)) {
+            throw new \Exception(__('messages.no_permission'));
         }
 
         $group = AdminGroup::find($groupId);
         if (!$group) {
-            throw new \Exception('المجموعة غير موجودة');
+            throw new \Exception(__('messages.group_not_found'));
         }
 
         $user->update(['admin_group_id' => $groupId]);

@@ -23,18 +23,6 @@ class UpdateAdminGroupRequest extends FormRequest
         ];
     }
 
-    public function messages()
-    {
-        return [
-            'title_en.required' => 'اسم المجموعة بالإنجليزية مطلوب.',
-            'title_en.unique' => 'هذا الاسم بالإنجليزية موجود مسبقاً.',
-            'title_en.max' => 'اسم المجموعة بالإنجليزية يجب ألا يتجاوز 255 حرفاً.',
-            'title_ar.required' => 'اسم المجموعة بالعربية مطلوب.',
-            'title_ar.unique' => 'هذا الاسم بالعربية موجود مسبقاً.',
-            'title_ar.max' => 'اسم المجموعة بالعربية يجب ألا يتجاوز 255 حرفاً.',
-            'description.max' => 'الوصف يجب ألا يتجاوز 500 حرف.',
-            'is_active.required' => 'حالة المجموعة مطلوبة.',
-            'is_active.boolean' => 'حالة المجموعة يجب أن تكون قيمة منطقية.',
-        ];
-    }
+    // ⬇️ تم حذف دالة messages() بالكامل
+    // ⬇️ تم حذف دالة attributes() بالكامل
 }

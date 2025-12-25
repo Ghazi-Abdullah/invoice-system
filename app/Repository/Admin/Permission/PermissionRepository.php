@@ -49,7 +49,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => true,
-                'message' => 'Permissions retrieved successfully',
+                'message' => __('messages.permissions_fetched'),
                 'data' => $permissions
             ];
 
@@ -59,7 +59,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve permissions: ' . $e->getMessage(),
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -73,14 +73,14 @@ class PermissionRepository implements PermissionInterface
             if (!$permission) {
                 return [
                     'status' => false,
-                    'message' => 'Permission not found',
+                    'message' => __('messages.permission_not_found'),
                     'data' => null
                 ];
             }
 
             return [
                 'status' => true,
-                'message' => 'Permission retrieved successfully',
+                'message' => __('messages.permission_fetched'),
                 'data' => $permission
             ];
 
@@ -89,7 +89,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve permission: ' . $e->getMessage(),
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -105,7 +105,7 @@ class PermissionRepository implements PermissionInterface
             if ($existingPermission) {
                 return [
                     'status' => false,
-                    'message' => 'Permission with this title already exists',
+                    'message' => __('messages.unique', ['attribute' => __('validation.attributes.title')]),
                     'data' => null
                 ];
             }
@@ -124,8 +124,8 @@ class PermissionRepository implements PermissionInterface
 
             // Log activity
             ActivityLog::log(
-                'CREATE',
-                'Created permission: ' . $permission->title,
+                Constants::ACTIVITY_CREATE,
+                __('messages.permission_created_log', ['title' => $permission->title]),
                 $permission
             );
 
@@ -133,7 +133,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => true,
-                'message' => 'Permission created successfully',
+                'message' => __('messages.permission_created'),
                 'data' => $permission
             ];
 
@@ -143,7 +143,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to create permission: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -165,7 +165,7 @@ class PermissionRepository implements PermissionInterface
                 if ($existingPermission) {
                     return [
                         'status' => false,
-                        'message' => 'Permission with this title already exists',
+                        'message' => __('messages.unique', ['attribute' => __('validation.attributes.title')]),
                         'data' => null
                     ];
                 }
@@ -187,8 +187,8 @@ class PermissionRepository implements PermissionInterface
 
             // Log activity
             ActivityLog::log(
-                'UPDATE',
-                'Updated permission: ' . $permission->title,
+                Constants::ACTIVITY_UPDATE,
+                __('messages.permission_updated_log', ['title' => $permission->title]),
                 $permission,
                 $oldValues,
                 $permission->fresh()->toArray()
@@ -198,7 +198,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => true,
-                'message' => 'Permission updated successfully',
+                'message' => __('messages.permission_updated'),
                 'data' => $permission
             ];
 
@@ -208,7 +208,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to update permission: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -226,7 +226,7 @@ class PermissionRepository implements PermissionInterface
             if ($permission->groups()->count() > 0) {
                 return [
                     'status' => false,
-                    'message' => 'Cannot delete permission that is assigned to groups',
+                    'message' => __('messages.cannot_delete_permission_with_groups'),
                     'data' => null
                 ];
             }
@@ -235,15 +235,15 @@ class PermissionRepository implements PermissionInterface
             if ($permission->children()->count() > 0) {
                 return [
                     'status' => false,
-                    'message' => 'Cannot delete permission that has child permissions',
+                    'message' => __('messages.cannot_delete_permission_with_children'),
                     'data' => null
                 ];
             }
 
             // Log activity before deletion
             ActivityLog::log(
-                'DELETE',
-                'Deleted permission: ' . $permissionTitle,
+                Constants::ACTIVITY_DELETE,
+                __('messages.permission_deleted_log', ['title' => $permissionTitle]),
                 $permission
             );
 
@@ -254,7 +254,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => true,
-                'message' => 'Permission deleted successfully',
+                'message' => __('messages.permission_deleted'),
                 'data' => ['id' => $permissionId]
             ];
 
@@ -264,7 +264,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to delete permission: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -279,7 +279,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => true,
-                'message' => 'All permissions retrieved successfully',
+                'message' => __('messages.permissions_fetched'),
                 'data' => $permissions
             ];
 
@@ -288,7 +288,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve all permissions: ' . $e->getMessage(),
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -336,7 +336,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => true,
-                'message' => 'Permissions with menus retrieved successfully',
+                'message' => __('messages.permissions_with_menus_fetched'),
                 'data' => $formattedPermissions
             ];
 
@@ -346,7 +346,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve permissions with menus: ' . $e->getMessage(),
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -362,7 +362,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => true,
-                'message' => 'Parent permissions retrieved successfully',
+                'message' => __('messages.parent_permissions_fetched'),
                 'data' => $permissions
             ];
 
@@ -371,7 +371,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve parent permissions: ' . $e->getMessage(),
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }

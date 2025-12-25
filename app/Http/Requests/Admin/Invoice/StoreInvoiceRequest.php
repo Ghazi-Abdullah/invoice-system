@@ -39,22 +39,7 @@ class StoreInvoiceRequest extends FormRequest
         ];
     }
 
-    public function messages()
-    {
-        return [
-            'client_id.required' => 'Client is required',
-            'client_id.exists' => 'Selected client does not exist',
-            'invoice_date.required' => 'Invoice date is required',
-            'due_date.required' => 'Due date is required',
-            'due_date.after_or_equal' => 'Due date must be on or after invoice date',
-            'items.required' => 'At least one item is required',
-            'items.*.description.required' => 'Item description is required',
-            'items.*.quantity.required' => 'Item quantity is required',
-            'items.*.quantity.min' => 'Item quantity must be at least 0.01',
-            'items.*.unit_price.required' => 'Item unit price is required',
-            'items.*.unit_price.min' => 'Item unit price must be at least 0',
-        ];
-    }
+    // ⬇️ تم حذف دالة messages() بالكامل
 
     protected function failedValidation(Validator $validator)
     {

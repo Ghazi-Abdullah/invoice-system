@@ -25,6 +25,8 @@ class SendInvoiceRequest extends FormRequest
         ];
     }
 
+    // ⬇️ تم حذف دالة messages() بالكامل
+
     protected function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(

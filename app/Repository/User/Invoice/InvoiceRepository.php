@@ -1,11 +1,12 @@
 <?php
-// app/Repository/User/Invoice/InvoiceRepository.php
+
 namespace App\Repository\User\Invoice;
 
 use App\Models\Invoice;
 use App\Models\Client;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Constants\Constants;
 
 class InvoiceRepository implements InvoiceInterface
 {
@@ -42,7 +43,7 @@ class InvoiceRepository implements InvoiceInterface
 
         // التأكد من أن الفاتورة تخص المستخدم
         if ($invoice->user_id !== $user->id) {
-            throw new \Exception('غير مصرح لك بالوصول إلى هذه الفاتورة');
+            throw new \Exception(__('messages.no_permission'));
         }
 
         return $invoice->load(['client', 'items']);
@@ -62,7 +63,7 @@ class InvoiceRepository implements InvoiceInterface
                 ->first();
 
             if (!$client) {
-                throw new \Exception('العميل غير موجود أو غير مسموح لك');
+                throw new \Exception(__('messages.client_not_found_or_unauthorized'));
             }
 
             // حساب المجاميع
@@ -80,15 +81,15 @@ class InvoiceRepository implements InvoiceInterface
             // إنشاء الفاتورة
             $invoice = Invoice::create([
                 'client_id' => $data['client_id'],
-                'invoice_number' => $data['invoice_number'],
-                'issue_date' => $data['issue_date'],
+                'invoice_number' => $data['invoice_number'] ?? $this->generateInvoiceNumber(),
+                'issue_date' => $data['invoice_date'],
                 'due_date' => $data['due_date'],
                 'subtotal' => $subtotal,
                 'tax_total' => $tax_total,
                 'total_amount' => $total_amount,
                 'notes' => $data['notes'] ?? null,
                 'terms' => $data['terms'] ?? null,
-                'status' => 'draft',
+                'status' => Constants::INVOICE_STATUS_DRAFT,
                 'user_id' => $user->id,
             ]);
 
@@ -101,15 +102,15 @@ class InvoiceRepository implements InvoiceInterface
                     'unit_price' => $itemData['unit_price'],
                     'total' => $itemTotal,
                     'tax_rate' => $itemData['tax_rate'] ?? 0,
+                    'item_type' => $itemData['item_type'] ?? 'service',
                 ]);
             }
 
             DB::commit();
             return $invoice->load(['client', 'items']);
-
         } catch (\Exception $e) {
             DB::rollBack();
-            throw new \Exception('فشل في إنشاء الفاتورة: ' . $e->getMessage());
+            throw new \Exception(__('messages.invoice_creation_failed') . ': ' . $e->getMessage());
         }
     }
 
@@ -119,7 +120,7 @@ class InvoiceRepository implements InvoiceInterface
 
         // التأكد من أن الفاتورة تخص المستخدم
         if ($invoice->user_id !== $user->id) {
-            throw new \Exception('غير مصرح لك بتعديل هذه الفاتورة');
+            throw new \Exception(__('messages.no_permission'));
         }
 
         DB::beginTransaction();
@@ -133,7 +134,7 @@ class InvoiceRepository implements InvoiceInterface
                     ->first();
 
                 if (!$client) {
-                    throw new \Exception('العميل غير موجود أو غير مسموح لك');
+                    throw new \Exception(__('messages.client_not_found_or_unauthorized'));
                 }
             }
 
@@ -158,6 +159,7 @@ class InvoiceRepository implements InvoiceInterface
                         'unit_price' => $itemData['unit_price'],
                         'total' => $itemTotal,
                         'tax_rate' => $itemData['tax_rate'] ?? 0,
+                        'item_type' => $itemData['item_type'] ?? 'service',
                     ]);
                 }
 
@@ -173,7 +175,7 @@ class InvoiceRepository implements InvoiceInterface
             $invoice->update([
                 'client_id' => $data['client_id'] ?? $invoice->client_id,
                 'invoice_number' => $data['invoice_number'] ?? $invoice->invoice_number,
-                'issue_date' => $data['issue_date'] ?? $invoice->issue_date,
+                'issue_date' => $data['invoice_date'] ?? $invoice->issue_date,
                 'due_date' => $data['due_date'] ?? $invoice->due_date,
                 'notes' => $data['notes'] ?? $invoice->notes,
                 'terms' => $data['terms'] ?? $invoice->terms,
@@ -181,10 +183,9 @@ class InvoiceRepository implements InvoiceInterface
 
             DB::commit();
             return $invoice->load(['client', 'items']);
-
         } catch (\Exception $e) {
             DB::rollBack();
-            throw new \Exception('فشل في تحديث الفاتورة: ' . $e->getMessage());
+            throw new \Exception(__('messages.invoice_update_failed') . ': ' . $e->getMessage());
         }
     }
 
@@ -194,7 +195,7 @@ class InvoiceRepository implements InvoiceInterface
 
         // التأكد من أن الفاتورة تخص المستخدم
         if ($invoice->user_id !== $user->id) {
-            throw new \Exception('غير مصرح لك بحذف هذه الفاتورة');
+            throw new \Exception(__('messages.no_permission'));
         }
 
         DB::beginTransaction();
@@ -205,10 +206,9 @@ class InvoiceRepository implements InvoiceInterface
 
             DB::commit();
             return true;
-
         } catch (\Exception $e) {
             DB::rollBack();
-            throw new \Exception('فشل في حذف الفاتورة: ' . $e->getMessage());
+            throw new \Exception(__('messages.invoice_delete_failed') . ': ' . $e->getMessage());
         }
     }
 
@@ -218,7 +218,7 @@ class InvoiceRepository implements InvoiceInterface
 
         // التأكد من أن الفاتورة تخص المستخدم
         if ($invoice->user_id !== $user->id) {
-            throw new \Exception('غير مصرح لك بتعديل هذه الفاتورة');
+            throw new \Exception(__('messages.no_permission'));
         }
 
         $invoice->update(['status' => $status]);
@@ -231,9 +231,12 @@ class InvoiceRepository implements InvoiceInterface
 
         $totalInvoices = Invoice::where('user_id', $user->id)->count();
         $totalAmount = Invoice::where('user_id', $user->id)->sum('total_amount');
-        $paidInvoices = Invoice::where('user_id', $user->id)->where('status', 'paid')->count();
-        $paidAmount = Invoice::where('user_id', $user->id)->where('status', 'paid')->sum('total_amount');
-        $overdueInvoices = Invoice::where('user_id', $user->id)->where('status', 'overdue')->count();
+        $paidInvoices = Invoice::where('user_id', $user->id)
+            ->where('status', Constants::INVOICE_STATUS_PAID)->count();
+        $paidAmount = Invoice::where('user_id', $user->id)
+            ->where('status', Constants::INVOICE_STATUS_PAID)->sum('total_amount');
+        $overdueInvoices = Invoice::where('user_id', $user->id)
+            ->where('status', Constants::INVOICE_STATUS_OVERDUE)->count();
 
         return [
             'total_invoices' => $totalInvoices,
@@ -244,5 +247,16 @@ class InvoiceRepository implements InvoiceInterface
             'average_invoice' => $totalInvoices > 0 ? round($totalAmount / $totalInvoices, 2) : 0,
             'payment_rate' => $totalInvoices > 0 ? round(($paidInvoices / $totalInvoices) * 100, 2) : 0,
         ];
+    }
+
+    private function generateInvoiceNumber()
+    {
+        $year = date('Y');
+        $month = date('m');
+        $sequence = Invoice::whereYear('created_at', $year)
+            ->whereMonth('created_at', $month)
+            ->count() + 1;
+
+        return 'INV-' . $year . $month . '-' . str_pad($sequence, 4, '0', STR_PAD_LEFT);
     }
 }

@@ -55,6 +55,11 @@ class Client extends Model
         return $this->hasMany(Invoice::class);
     }
 
+    public function paidInvoices()
+    {
+        return $this->hasMany(Invoice::class)->where('status', Constants::INVOICE_STATUS_PAID);
+    }
+
     // Methods
     public function totalInvoiced()
     {
@@ -63,7 +68,7 @@ class Client extends Model
 
     public function totalPaid()
     {
-        return $this->invoices()->where('status', Constants::INVOICE_STATUS_PAID)->sum('total');
+        return $this->paidInvoices()->sum('total');
     }
 
     public function totalDue()

@@ -1,10 +1,11 @@
 <?php
-// app/Repository/User/Client/ClientRepository.php
+
 namespace App\Repository\User\Client;
 
 use App\Models\Client;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use App\Constants\Constants;
 
 class ClientRepository implements ClientInterface
 {
@@ -27,7 +28,7 @@ class ClientRepository implements ClientInterface
 
         // التأكد من أن العميل يخص المستخدم
         if ($client->user_id !== $user->id) {
-            throw new \Exception('غير مصرح لك بالوصول إلى هذا العميل');
+            throw new \Exception(__('messages.no_permission'));
         }
 
         return $client->load(['invoices.items']);
@@ -49,7 +50,7 @@ class ClientRepository implements ClientInterface
 
         // التأكد من أن العميل يخص المستخدم
         if ($client->user_id !== $user->id) {
-            throw new \Exception('غير مصرح لك بتعديل هذا العميل');
+            throw new \Exception(__('messages.no_permission'));
         }
 
         $client->update($request->validated());
@@ -62,12 +63,12 @@ class ClientRepository implements ClientInterface
 
         // التأكد من أن العميل يخص المستخدم
         if ($client->user_id !== $user->id) {
-            throw new \Exception('غير مصرح لك بحذف هذا العميل');
+            throw new \Exception(__('messages.no_permission'));
         }
 
         // التحقق مما إذا كان العميل لديه فواتير
         if ($client->invoices()->count() > 0) {
-            throw new \Exception('لا يمكن حذف عميل لديه فواتير مرتبطة');
+            throw new \Exception(__('messages.client_has_invoices'));
         }
 
         $client->delete();

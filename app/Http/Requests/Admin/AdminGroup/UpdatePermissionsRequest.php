@@ -19,12 +19,6 @@ class UpdatePermissionsRequest extends FormRequest
         ];
     }
 
-    public function messages()
-    {
-        return [
-            'permissions.required' => 'Permissions are required.',
-            'permissions.array' => 'Permissions must be an array.',
-            'permissions.*.exists' => 'One or more permissions do not exist.',
-        ];
-    }
+    // ⬇️ تم حذف دالة messages() بالكامل
+    // ⬇️ تم حذف دالة attributes() بالكامل
 }

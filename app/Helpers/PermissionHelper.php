@@ -114,6 +114,34 @@ class PermissionHelper
     }
 
     /**
+     * Get translated permission title
+     */
+    public static function getTranslatedPermission($permissionKey)
+    {
+        return __("messages.{$permissionKey}");
+    }
+
+    /**
+     * Get all permissions with translation
+     */
+    public static function getAllPermissionsWithTranslation()
+    {
+        $permissions = AdminPermission::where('is_active', Constants::ACTIVE)
+            ->get(['id', 'title']);
+
+        $result = [];
+        foreach ($permissions as $permission) {
+            $result[] = [
+                'id' => $permission->id,
+                'title' => $permission->title,
+                'translated_title' => self::getTranslatedPermission($permission->title)
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * Check if user is admin
      */
     public static function isAdmin()
@@ -168,5 +196,19 @@ class PermissionHelper
         }
 
         return $user->adminGroup;
+    }
+
+    /**
+     * Get user's admin group name (translated)
+     */
+    public static function getUserAdminGroupName()
+    {
+        $adminGroup = self::getUserAdminGroup();
+
+        if (!$adminGroup) {
+            return null;
+        }
+
+        return app()->getLocale() === 'ar' ? $adminGroup->title_ar : $adminGroup->title_en;
     }
 }

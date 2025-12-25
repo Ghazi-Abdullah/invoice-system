@@ -43,14 +43,14 @@ class UserRepository implements UserInterface
 
             return [
                 'status' => true,
-                'message' => 'Users retrieved successfully',
+                'message' => __('messages.users_fetched'),
                 'data' => $users
             ];
 
         } catch (\Exception $e) {
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve users: ' . $e->getMessage(),
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -64,21 +64,21 @@ class UserRepository implements UserInterface
             if (!$user) {
                 return [
                     'status' => false,
-                    'message' => 'User not found',
+                    'message' => __('messages.user_not_found'),
                     'data' => null
                 ];
             }
 
             return [
                 'status' => true,
-                'message' => 'User retrieved successfully',
+                'message' => __('messages.user_fetched'),
                 'data' => $user
             ];
 
         } catch (\Exception $e) {
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve user: ' . $e->getMessage(),
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -93,7 +93,7 @@ class UserRepository implements UserInterface
             if (User::where('email', $request->email)->exists()) {
                 return [
                     'status' => false,
-                    'message' => 'Email already exists',
+                    'message' => __('messages.email_already_registered'),
                     'data' => null
                 ];
             }
@@ -113,8 +113,8 @@ class UserRepository implements UserInterface
 
             // Log activity
             ActivityLog::log(
-                'CREATE',
-                'Created user: ' . $user->name,
+                Constants::ACTIVITY_CREATE,
+                __('messages.user_created_log', ['name' => $user->name]),
                 $user
             );
 
@@ -122,7 +122,7 @@ class UserRepository implements UserInterface
 
             return [
                 'status' => true,
-                'message' => 'User created successfully',
+                'message' => __('messages.user_created'),
                 'data' => $user
             ];
 
@@ -131,7 +131,7 @@ class UserRepository implements UserInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to create user: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -149,7 +149,7 @@ class UserRepository implements UserInterface
                 if (User::where('email', $request->email)->where('id', '!=', $user->id)->exists()) {
                     return [
                         'status' => false,
-                        'message' => 'Email already exists',
+                        'message' => __('messages.email_already_registered'),
                         'data' => null
                     ];
                 }
@@ -176,8 +176,8 @@ class UserRepository implements UserInterface
 
             // Log activity
             ActivityLog::log(
-                'UPDATE',
-                'Updated user: ' . $user->name,
+                Constants::ACTIVITY_UPDATE,
+                __('messages.user_updated_log', ['name' => $user->name]),
                 $user,
                 $oldValues,
                 $user->fresh()->toArray()
@@ -187,7 +187,7 @@ class UserRepository implements UserInterface
 
             return [
                 'status' => true,
-                'message' => 'User updated successfully',
+                'message' => __('messages.user_updated'),
                 'data' => $user
             ];
 
@@ -196,7 +196,7 @@ class UserRepository implements UserInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to update user: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -211,16 +211,16 @@ class UserRepository implements UserInterface
             if ($user->id === auth()->id()) {
                 return [
                     'status' => false,
-                    'message' => 'Cannot delete your own account',
+                    'message' => __('messages.cannot_delete_own_account'),
                     'data' => null
                 ];
             }
 
             // Prevent deleting super admin
-            if ($user->isSuperAdmin()) {
+            if ($user->admin_group_id === Constants::SUPER_ADMIN_GROUP_ID) {
                 return [
                     'status' => false,
-                    'message' => 'Cannot delete super admin',
+                    'message' => __('messages.cannot_delete_super_admin'),
                     'data' => null
                 ];
             }
@@ -229,18 +229,18 @@ class UserRepository implements UserInterface
             $userId = $user->id;
 
             // Check if user has created invoices
-            if ($user->createdInvoices()->count() > 0) {
+            if ($user->invoices()->count() > 0) {
                 return [
                     'status' => false,
-                    'message' => 'Cannot delete user with created invoices',
+                    'message' => __('messages.cannot_delete_user_with_invoices'),
                     'data' => null
                 ];
             }
 
             // Log activity before deletion
             ActivityLog::log(
-                'DELETE',
-                'Deleted user: ' . $userName,
+                Constants::ACTIVITY_DELETE,
+                __('messages.user_deleted_log', ['name' => $userName]),
                 $user
             );
 
@@ -251,7 +251,7 @@ class UserRepository implements UserInterface
 
             return [
                 'status' => true,
-                'message' => 'User deleted successfully',
+                'message' => __('messages.user_deleted'),
                 'data' => ['id' => $userId]
             ];
 
@@ -260,7 +260,7 @@ class UserRepository implements UserInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to delete user: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -286,7 +286,7 @@ class UserRepository implements UserInterface
                 if (User::where('email', $request->email)->where('id', '!=', $user->id)->exists()) {
                     return [
                         'status' => false,
-                        'message' => 'Email already exists',
+                        'message' => __('messages.email_already_registered'),
                         'data' => null
                     ];
                 }
@@ -298,7 +298,7 @@ class UserRepository implements UserInterface
             // Log activity
             ActivityLog::log(
                 'UPDATE_PROFILE',
-                'Updated profile',
+                __('messages.profile_updated_log'),
                 $user,
                 $oldValues,
                 $user->fresh()->toArray()
@@ -306,14 +306,14 @@ class UserRepository implements UserInterface
 
             return [
                 'status' => true,
-                'message' => 'Profile updated successfully',
+                'message' => __('messages.profile_updated'),
                 'data' => $user
             ];
 
         } catch (\Exception $e) {
             return [
                 'status' => false,
-                'message' => 'Failed to update profile: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -328,7 +328,7 @@ class UserRepository implements UserInterface
             if (!Hash::check($request->current_password, $user->password)) {
                 return [
                     'status' => false,
-                    'message' => 'Current password is incorrect',
+                    'message' => __('messages.password_invalid'),
                     'data' => null
                 ];
             }
@@ -341,20 +341,20 @@ class UserRepository implements UserInterface
             // Log activity
             ActivityLog::log(
                 'CHANGE_PASSWORD',
-                'Changed password',
+                __('messages.password_changed_log'),
                 $user
             );
 
             return [
                 'status' => true,
-                'message' => 'Password changed successfully',
+                'message' => __('messages.password_changed'),
                 'data' => null
             ];
 
         } catch (\Exception $e) {
             return [
                 'status' => false,
-                'message' => 'Failed to change password: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -367,7 +367,7 @@ class UserRepository implements UserInterface
             if ($user->id === auth()->id() && !$status) {
                 return [
                     'status' => false,
-                    'message' => 'Cannot deactivate your own account',
+                    'message' => __('messages.cannot_deactivate_own_account'),
                     'data' => null
                 ];
             }
@@ -378,20 +378,24 @@ class UserRepository implements UserInterface
             // Log activity
             ActivityLog::log(
                 'UPDATE_STATUS',
-                'Updated user status from ' . ($oldStatus ? 'Active' : 'Inactive') . ' to ' . ($status ? 'Active' : 'Inactive'),
+                __('messages.user_status_updated_log', [
+                    'name' => $user->name,
+                    'old_status' => $oldStatus ? __('messages.active') : __('messages.inactive'),
+                    'new_status' => $status ? __('messages.active') : __('messages.inactive')
+                ]),
                 $user
             );
 
             return [
                 'status' => true,
-                'message' => 'User status updated successfully',
+                'message' => __('messages.user_status_updated'),
                 'data' => $user
             ];
 
         } catch (\Exception $e) {
             return [
                 'status' => false,
-                'message' => 'Failed to update user status: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -401,20 +405,20 @@ class UserRepository implements UserInterface
     {
         try {
             $staff = User::with(['adminGroup'])
-                ->staff()
-                ->active()
+                ->whereIn('admin_group_id', [Constants::SUPER_ADMIN_GROUP_ID, Constants::ADMIN_GROUP_ID])
+                ->where('is_active', true)
                 ->get();
 
             return [
                 'status' => true,
-                'message' => 'Staff users retrieved successfully',
+                'message' => __('messages.staff_users_fetched'),
                 'data' => $staff
             ];
 
         } catch (\Exception $e) {
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve staff users: ' . $e->getMessage(),
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -424,20 +428,20 @@ class UserRepository implements UserInterface
     {
         try {
             $clients = User::with(['adminGroup'])
-                ->clients()
-                ->active()
+                ->where('admin_group_id', Constants::CLIENT_GROUP_ID)
+                ->where('is_active', true)
                 ->get();
 
             return [
                 'status' => true,
-                'message' => 'Client users retrieved successfully',
+                'message' => __('messages.client_users_fetched'),
                 'data' => $clients
             ];
 
         } catch (\Exception $e) {
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve client users: ' . $e->getMessage(),
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }

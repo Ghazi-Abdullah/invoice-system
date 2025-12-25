@@ -52,7 +52,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => true,
-                'message' => 'Clients retrieved successfully',
+                'message' => __('messages.clients_fetched'),
                 'data' => $clients
             ];
 
@@ -62,7 +62,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve clients: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -76,7 +76,7 @@ class ClientRepository implements ClientInterface
             if (!$client) {
                 return [
                     'status' => false,
-                    'message' => 'Client not found',
+                    'message' => __('messages.client_not_found'),
                     'data' => null
                 ];
             }
@@ -89,7 +89,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => true,
-                'message' => 'Client retrieved successfully',
+                'message' => __('messages.client_fetched'),
                 'data' => $client
             ];
 
@@ -98,7 +98,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve client: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -114,7 +114,7 @@ class ClientRepository implements ClientInterface
             if ($existingClient) {
                 return [
                     'status' => false,
-                    'message' => 'Email already exists',
+                    'message' => __('messages.email_already_registered'),
                     'data' => null
                 ];
             }
@@ -137,7 +137,7 @@ class ClientRepository implements ClientInterface
             // تسجيل النشاط
             ActivityLog::log(
                 'CREATE',
-                'Created client: ' . $client->name,
+                __('messages.client_created') . ': ' . $client->name,
                 $client
             );
 
@@ -145,7 +145,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => true,
-                'message' => 'Client created successfully',
+                'message' => __('messages.client_created'),
                 'data' => $client->load(['user'])
             ];
 
@@ -155,7 +155,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to create client: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -177,7 +177,7 @@ class ClientRepository implements ClientInterface
                 if ($existingClient) {
                     return [
                         'status' => false,
-                        'message' => 'Email already exists',
+                        'message' => __('messages.email_already_registered'),
                         'data' => null
                     ];
                 }
@@ -202,7 +202,7 @@ class ClientRepository implements ClientInterface
             // تسجيل النشاط
             ActivityLog::log(
                 'UPDATE',
-                'Updated client: ' . $client->name,
+                __('messages.client_updated') . ': ' . $client->name,
                 $client,
                 $oldValues,
                 $client->fresh()->toArray()
@@ -212,7 +212,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => true,
-                'message' => 'Client updated successfully',
+                'message' => __('messages.client_updated'),
                 'data' => $client->load(['user'])
             ];
 
@@ -222,7 +222,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to update client: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -240,7 +240,7 @@ class ClientRepository implements ClientInterface
             if ($client->invoices()->count() > 0) {
                 return [
                     'status' => false,
-                    'message' => 'Cannot delete client with existing invoices',
+                    'message' => __('messages.client_has_invoices'),
                     'data' => null
                 ];
             }
@@ -248,7 +248,7 @@ class ClientRepository implements ClientInterface
             // تسجيل النشاط قبل الحذف
             ActivityLog::log(
                 'DELETE',
-                'Deleted client: ' . $clientName,
+                __('messages.client_deleted') . ': ' . $clientName,
                 $client
             );
 
@@ -259,7 +259,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => true,
-                'message' => 'Client deleted successfully',
+                'message' => __('messages.client_deleted'),
                 'data' => ['id' => $clientId]
             ];
 
@@ -269,7 +269,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to delete client: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -301,7 +301,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => true,
-                'message' => 'Client stats retrieved successfully',
+                'message' => __('messages.client_stats_fetched'),
                 'data' => $stats
             ];
 
@@ -310,7 +310,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve client stats: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -330,7 +330,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => true,
-                'message' => 'Clients search completed',
+                'message' => __('messages.client_search_fetched'),
                 'data' => $clients
             ];
 
@@ -339,7 +339,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to search clients: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
@@ -354,7 +354,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => true,
-                'message' => 'Client invoices retrieved successfully',
+                'message' => __('messages.client_invoices_fetched'),
                 'data' => $invoices
             ];
 
@@ -363,7 +363,7 @@ class ClientRepository implements ClientInterface
 
             return [
                 'status' => false,
-                'message' => 'Failed to retrieve client invoices: ' . $e->getMessage(),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }

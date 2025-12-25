@@ -65,11 +65,13 @@ class Invoice extends Model
 
     public function scopeOverdue($query)
     {
-        return $query->where('status', Constants::INVOICE_STATUS_OVERDUE)
-                     ->orWhere(function($q) {
-                         $q->where('status', Constants::INVOICE_STATUS_SENT)
-                           ->where('due_date', '<', now());
-                     });
+        return $query->where(function($q) {
+            $q->where('status', Constants::INVOICE_STATUS_OVERDUE)
+              ->orWhere(function($query) {
+                  $query->where('status', Constants::INVOICE_STATUS_SENT)
+                        ->where('due_date', '<', now());
+              });
+        });
     }
 
     public function scopeSearch($query, $search)
