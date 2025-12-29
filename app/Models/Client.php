@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Constants\Constants;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Client extends Model
 {
@@ -16,50 +17,62 @@ class Client extends Model
         'address',
         'company_name',
         'tax_number',
+        'payment_terms',
+        'currency',
         'notes',
-        'status',
-        'user_id'
+        'is_active',
+        'created_by'
     ];
 
     protected $casts = [
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'is_active' => 'boolean',
     ];
 
-    /**
-     * العلاقة مع الفواتير
-     */
+    // Scopes
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', Constants::ACTIVE);
+    }
+
+    public function scopeSearch($query, $search)
+    {
+        return $query->where(function($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('email', 'like', "%{$search}%")
+              ->orWhere('company_name', 'like', "%{$search}%")
+              ->orWhere('phone', 'like', "%{$search}%");
+        });
+    }
+
+    // Relations
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
     public function invoices()
     {
         return $this->hasMany(Invoice::class);
     }
 
-    /**
-     * العلاقة مع المستخدم الذي أضاف العميل
-     */
-    public function user()
+    public function paidInvoices()
     {
-        return $this->belongsTo(User::class);
+        return $this->hasMany(Invoice::class)->where('status', Constants::INVOICE_STATUS_PAID);
     }
 
-    /**
-     * Scope للعملاء النشطين
-     */
-    public function scopeActive($query)
+    // Methods
+    public function totalInvoiced()
     {
-        return $query->where('status', 'active');
+        return $this->invoices()->sum('total');
     }
 
-    /**
-     * Scope للبحث
-     */
-    public function scopeSearch($query, $search)
+    public function totalPaid()
     {
-        return $query->where(function ($q) use ($search) {
-            $q->where('name', 'like', "%{$search}%")
-              ->orWhere('email', 'like', "%{$search}%")
-              ->orWhere('phone', 'like', "%{$search}%")
-              ->orWhere('company_name', 'like', "%{$search}%");
-        });
+        return $this->paidInvoices()->sum('total');
+    }
+
+    public function totalDue()
+    {
+        return $this->totalInvoiced() - $this->totalPaid();
     }
 }

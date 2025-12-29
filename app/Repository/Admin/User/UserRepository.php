@@ -1,0 +1,449 @@
+<?php
+
+namespace App\Repository\Admin\User;
+
+use App\Models\User;
+use App\Models\ActivityLog;
+use App\Constants\Constants;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+
+class UserRepository implements UserInterface
+{
+    public function index($request)
+    {
+        try {
+            $query = User::with('adminGroup')
+                ->orderBy('created_at', 'desc');
+
+            // Apply filters
+            if ($request->has('is_active')) {
+                $query->where('is_active', $request->is_active);
+            }
+
+            if ($request->has('admin_group_id')) {
+                $query->where('admin_group_id', $request->admin_group_id);
+            }
+
+            if ($request->has('search')) {
+                $query->where(function($q) use ($request) {
+                    $q->where('name', 'like', "%{$request->search}%")
+                      ->orWhere('email', 'like', "%{$request->search}%");
+                });
+            }
+
+            // Get paginated or all results
+            if ($request->has('per_page')) {
+                $users = $query->paginate(
+                    min($request->per_page, Constants::MAX_PER_PAGE)
+                );
+            } else {
+                $users = $query->get();
+            }
+
+            return [
+                'status' => true,
+                'message' => __('messages.users_fetched'),
+                'data' => $users
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'status' => false,
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+
+    public function show($id)
+    {
+        try {
+            $user = User::with(['adminGroup'])->find($id);
+
+            if (!$user) {
+                return [
+                    'status' => false,
+                    'message' => __('messages.user_not_found'),
+                    'data' => null
+                ];
+            }
+
+            return [
+                'status' => true,
+                'message' => __('messages.user_fetched'),
+                'data' => $user
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'status' => false,
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+
+    public function store($request)
+    {
+        DB::beginTransaction();
+
+        try {
+            // Check if email already exists
+            if (User::where('email', $request->email)->exists()) {
+                return [
+                    'status' => false,
+                    'message' => __('messages.email_already_registered'),
+                    'data' => null
+                ];
+            }
+
+            // Create user
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
+                'phone' => $request->phone,
+                'address' => $request->address,
+                'company_name' => $request->company_name,
+                'tax_number' => $request->tax_number,
+                'is_active' => $request->is_active ?? true,
+                'admin_group_id' => $request->admin_group_id
+            ]);
+
+            // Log activity
+            ActivityLog::log(
+                Constants::ACTIVITY_CREATE,
+                __('messages.user_created_log', ['name' => $user->name]),
+                $user
+            );
+
+            DB::commit();
+
+            return [
+                'status' => true,
+                'message' => __('messages.user_created'),
+                'data' => $user
+            ];
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return [
+                'status' => false,
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+
+    public function update($request, $user)
+    {
+        DB::beginTransaction();
+
+        try {
+            $oldValues = $user->toArray();
+
+            // Check if email already exists for other users
+            if ($request->has('email') && $request->email !== $user->email) {
+                if (User::where('email', $request->email)->where('id', '!=', $user->id)->exists()) {
+                    return [
+                        'status' => false,
+                        'message' => __('messages.email_already_registered'),
+                        'data' => null
+                    ];
+                }
+            }
+
+            $updateData = [
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'address' => $request->address,
+                'company_name' => $request->company_name,
+                'tax_number' => $request->tax_number,
+                'is_active' => $request->is_active ?? $user->is_active,
+                'admin_group_id' => $request->admin_group_id ?? $user->admin_group_id
+            ];
+
+            // Update password if provided
+            if ($request->has('password') && $request->password) {
+                $updateData['password'] = Hash::make($request->password);
+            }
+
+            // Update user
+            $user->update($updateData);
+
+            // Log activity
+            ActivityLog::log(
+                Constants::ACTIVITY_UPDATE,
+                __('messages.user_updated_log', ['name' => $user->name]),
+                $user,
+                $oldValues,
+                $user->fresh()->toArray()
+            );
+
+            DB::commit();
+
+            return [
+                'status' => true,
+                'message' => __('messages.user_updated'),
+                'data' => $user
+            ];
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return [
+                'status' => false,
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+
+    public function destroy($user)
+    {
+        DB::beginTransaction();
+
+        try {
+            // Prevent deleting self
+            if ($user->id === auth()->id()) {
+                return [
+                    'status' => false,
+                    'message' => __('messages.cannot_delete_own_account'),
+                    'data' => null
+                ];
+            }
+
+            // Prevent deleting super admin
+            if ($user->admin_group_id === Constants::SUPER_ADMIN_GROUP_ID) {
+                return [
+                    'status' => false,
+                    'message' => __('messages.cannot_delete_super_admin'),
+                    'data' => null
+                ];
+            }
+
+            $userName = $user->name;
+            $userId = $user->id;
+
+            // Check if user has created invoices
+            if ($user->invoices()->count() > 0) {
+                return [
+                    'status' => false,
+                    'message' => __('messages.cannot_delete_user_with_invoices'),
+                    'data' => null
+                ];
+            }
+
+            // Log activity before deletion
+            ActivityLog::log(
+                Constants::ACTIVITY_DELETE,
+                __('messages.user_deleted_log', ['name' => $userName]),
+                $user
+            );
+
+            // Delete user
+            $user->delete();
+
+            DB::commit();
+
+            return [
+                'status' => true,
+                'message' => __('messages.user_deleted'),
+                'data' => ['id' => $userId]
+            ];
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return [
+                'status' => false,
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+
+    public function updateProfile($request)
+    {
+        try {
+            $user = auth()->user();
+            $oldValues = $user->toArray();
+
+            $updateData = [
+                'name' => $request->name,
+                'phone' => $request->phone,
+                'address' => $request->address,
+                'company_name' => $request->company_name,
+                'tax_number' => $request->tax_number
+            ];
+
+            // Update email if provided and different
+            if ($request->has('email') && $request->email !== $user->email) {
+                // Check if email already exists
+                if (User::where('email', $request->email)->where('id', '!=', $user->id)->exists()) {
+                    return [
+                        'status' => false,
+                        'message' => __('messages.email_already_registered'),
+                        'data' => null
+                    ];
+                }
+                $updateData['email'] = $request->email;
+            }
+
+            $user->update($updateData);
+
+            // Log activity
+            ActivityLog::log(
+                'UPDATE_PROFILE',
+                __('messages.profile_updated_log'),
+                $user,
+                $oldValues,
+                $user->fresh()->toArray()
+            );
+
+            return [
+                'status' => true,
+                'message' => __('messages.profile_updated'),
+                'data' => $user
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'status' => false,
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+
+    public function changePassword($request)
+    {
+        try {
+            $user = auth()->user();
+
+            // Verify current password
+            if (!Hash::check($request->current_password, $user->password)) {
+                return [
+                    'status' => false,
+                    'message' => __('messages.password_invalid'),
+                    'data' => null
+                ];
+            }
+
+            // Update password
+            $user->update([
+                'password' => Hash::make($request->new_password)
+            ]);
+
+            // Log activity
+            ActivityLog::log(
+                'CHANGE_PASSWORD',
+                __('messages.password_changed_log'),
+                $user
+            );
+
+            return [
+                'status' => true,
+                'message' => __('messages.password_changed'),
+                'data' => null
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'status' => false,
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+
+    public function updateStatus($user, $status)
+    {
+        try {
+            // Prevent deactivating self
+            if ($user->id === auth()->id() && !$status) {
+                return [
+                    'status' => false,
+                    'message' => __('messages.cannot_deactivate_own_account'),
+                    'data' => null
+                ];
+            }
+
+            $oldStatus = $user->is_active;
+            $user->update(['is_active' => $status]);
+
+            // Log activity
+            ActivityLog::log(
+                'UPDATE_STATUS',
+                __('messages.user_status_updated_log', [
+                    'name' => $user->name,
+                    'old_status' => $oldStatus ? __('messages.active') : __('messages.inactive'),
+                    'new_status' => $status ? __('messages.active') : __('messages.inactive')
+                ]),
+                $user
+            );
+
+            return [
+                'status' => true,
+                'message' => __('messages.user_status_updated'),
+                'data' => $user
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'status' => false,
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+
+    public function getStaffUsers()
+    {
+        try {
+            $staff = User::with(['adminGroup'])
+                ->whereIn('admin_group_id', [Constants::SUPER_ADMIN_GROUP_ID, Constants::ADMIN_GROUP_ID])
+                ->where('is_active', true)
+                ->get();
+
+            return [
+                'status' => true,
+                'message' => __('messages.staff_users_fetched'),
+                'data' => $staff
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'status' => false,
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+
+    public function getClientUsers()
+    {
+        try {
+            $clients = User::with(['adminGroup'])
+                ->where('admin_group_id', Constants::CLIENT_GROUP_ID)
+                ->where('is_active', true)
+                ->get();
+
+            return [
+                'status' => true,
+                'message' => __('messages.client_users_fetched'),
+                'data' => $clients
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'status' => false,
+                'message' => __('messages.error') . ': ' . $e->getMessage(),
+                'data' => null
+            ];
+        }
+    }
+}

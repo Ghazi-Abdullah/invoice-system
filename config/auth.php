@@ -1,7 +1,6 @@
 <?php
 
 return [
-
     'defaults' => [
         'guard' => 'web',
         'passwords' => 'users',
@@ -14,7 +13,7 @@ return [
         ],
 
         'api' => [
-            'driver' => 'sanctum',  // أو 'token' إذا كنت تستخدام Passport
+            'driver' => 'sanctum',
             'provider' => 'users',
             'hash' => false,
         ],
@@ -37,5 +36,4 @@ return [
     ],
 
     'password_timeout' => 10800,
-
 ];

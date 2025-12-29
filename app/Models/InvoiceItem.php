@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class InvoiceItem extends Model
 {
@@ -14,34 +14,32 @@ class InvoiceItem extends Model
         'description',
         'quantity',
         'unit_price',
+        'tax_rate',
         'total',
-        'tax_rate'
+        'item_type',
+        'notes'
     ];
 
     protected $casts = [
         'quantity' => 'decimal:2',
         'unit_price' => 'decimal:2',
+        'tax_rate' => 'decimal:2',
         'total' => 'decimal:2',
-        'tax_rate' => 'decimal:2'
     ];
 
-    /**
-     * العلاقة مع الفاتورة
-     */
+    // Relations
     public function invoice()
     {
         return $this->belongsTo(Invoice::class);
     }
 
-    /**
-     * حساب الإجمالي تلقائياً قبل الحفظ
-     */
-    protected static function boot()
+    // Methods
+    public function calculateTotal()
     {
-        parent::boot();
+        $subtotal = $this->quantity * $this->unit_price;
+        $taxAmount = $subtotal * ($this->tax_rate / 100);
+        $this->total = $subtotal + $taxAmount;
 
-        static::saving(function ($item) {
-            $item->total = $item->quantity * $item->unit_price;
-        });
+        return $this->total;
     }
 }
