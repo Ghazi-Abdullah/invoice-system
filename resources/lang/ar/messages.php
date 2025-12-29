@@ -186,7 +186,7 @@ return [
     'password_changed_log' => 'تم تغيير كلمة المرور',
     'user_status_updated_log' => 'تم تحديث حالة المستخدم :name من :old_status إلى :new_status',
     'cannot_deactivate_own_account' => 'لا يمكن تعطيل حسابك الخاص',
-    
+
     // بعد الترجمات الحالية، أضف:
     'client_has_invoices' => 'لا يمكن حذف عميل لديه فواتير مرتبطة',
     'client_not_found_or_unauthorized' => 'العميل غير موجود أو غير مصرح لك بالوصول إليه',
@@ -207,4 +207,206 @@ return [
     'too_many_requests' => 'طلبات كثيرة جداً',
     'maintenance_mode' => 'النظام في وضع الصيانة',
     'service_unavailable' => 'الخدمة غير متوفرة',
+
+    // Success Messages
+    'success' => 'تمت العملية بنجاح',
+    'created' => 'تم الإنشاء بنجاح',
+    'updated' => 'تم التحديث بنجاح',
+    'deleted' => 'تم الحذف بنجاح',
+    'saved' => 'تم الحفظ بنجاح',
+    'sent' => 'تم الإرسال بنجاح',
+
+    // Auth Messages
+    'login_success' => 'تم تسجيل الدخول بنجاح',
+    'logout_success' => 'تم تسجيل الخروج بنجاح',
+    'register_success' => 'تم التسجيل بنجاح',
+    'login_failed' => 'فشل تسجيل الدخول',
+    'logout_failed' => 'فشل تسجيل الخروج',
+    'user_not_found' => 'المستخدم غير موجود',
+    'incorrect_password' => 'كلمة المرور غير صحيحة',
+    'inactive_account' => 'الحساب غير نشط',
+    'unauthenticated' => 'غير مصرح بالدخول',
+    'unauthorized' => 'غير مصرح بالوصول',
+    'forbidden' => 'محظور الوصول',
+    'token_refreshed' => 'تم تجديد التوكن بنجاح',
+    'password_changed' => 'تم تغيير كلمة المرور بنجاح',
+
+    // Validation Messages
+    'validation_error' => 'خطأ في التحقق',
+    'required_field' => 'حقل مطلوب',
+    'invalid_email' => 'بريد إلكتروني غير صحيح',
+    'invalid_phone' => 'رقم هاتف غير صحيح',
+    'unique' => ':attribute مستخدم من قبل',
+    'exists' => ':attribute غير موجود',
+    'min' => ':attribute يجب أن يكون على الأقل :min',
+    'max' => ':attribute يجب أن لا يتجاوز :max',
+    'numeric' => ':attribute يجب أن يكون رقم',
+    'string' => ':attribute يجب أن يكون نص',
+    'array' => ':attribute يجب أن يكون مصفوفة',
+    'boolean' => ':attribute يجب أن يكون true أو false',
+    'date' => ':attribute يجب أن يكون تاريخ صحيح',
+    'after_or_equal' => ':attribute يجب أن يكون بعد أو يساوي :date',
+
+    // Error Messages
+    'error' => 'حدث خطأ',
+    'server_error' => 'خطأ في الخادم',
+    'not_found' => 'غير موجود',
+    'method_not_allowed' => 'الطريقة غير مسموحة',
+    'too_many_requests' => 'طلبات كثيرة جداً',
+    'service_unavailable' => 'الخدمة غير متاحة',
+    'operation_failed' => 'فشلت العملية',
+    'connection_error' => 'خطأ في الاتصال',
+    'timeout' => 'انتهت المهلة',
+
+    // Dashboard Messages
+    'dashboard_stats_fetched' => 'تم جلب إحصائيات الداشبورد',
+    'monthly_revenue_fetched' => 'تم جلب الإيرادات الشهرية',
+    'overdue_invoices_fetched' => 'تم جلب الفواتير المتأخرة',
+    'recent_activity_fetched' => 'تم جلب النشاط الأخير',
+    'recent_invoices_fetched' => 'تم جلب الفواتير الحديثة',
+    'recent_clients_fetched' => 'تم جلب العملاء الحديثين',
+    'dashboard_data_fetched' => 'تم جلب بيانات الداشبورد',
+    'dashboard_report_generated' => 'تم إنشاء تقرير الداشبورد',
+
+    // Client Messages
+    'client_created' => 'تم إنشاء العميل',
+    'client_updated' => 'تم تحديث العميل',
+    'client_deleted' => 'تم حذف العميل',
+    'client_fetched' => 'تم جلب بيانات العميل',
+    'clients_fetched' => 'تم جلب العملاء',
+    'client_not_found' => 'العميل غير موجود',
+    'client_has_invoices' => 'لا يمكن حذف العميل لديه فواتير مرتبطة',
+    'email_already_registered' => 'البريد الإلكتروني مسجل مسبقاً',
+    'client_stats_fetched' => 'تم جلب إحصائيات العميل',
+    'client_search_fetched' => 'تم جلب نتائج البحث',
+    'client_invoices_fetched' => 'تم جلب فواتير العميل',
+
+    // Invoice Messages
+    'invoice_created' => 'تم إنشاء الفاتورة',
+    'invoice_updated' => 'تم تحديث الفاتورة',
+    'invoice_deleted' => 'تم حذف الفاتورة',
+    'invoice_fetched' => 'تم جلب بيانات الفاتورة',
+    'invoices_fetched' => 'تم جلب الفواتير',
+    'invoice_not_found' => 'الفاتورة غير موجودة',
+    'invoice_sent' => 'تم إرسال الفاتورة',
+    'invoice_marked_paid' => 'تم وضع علامة مدفوعة على الفاتورة',
+    'invoice_duplicated' => 'تم نسخ الفاتورة',
+    'pdf_generated' => 'تم إنشاء ملف PDF',
+    'payment_recorded' => 'تم تسجيل الدفع',
+
+    // Permission Messages
+    'permission_created' => 'تم إنشاء الصلاحية',
+    'permission_updated' => 'تم تحديث الصلاحية',
+    'permission_deleted' => 'تم حذف الصلاحية',
+    'permission_fetched' => 'تم جلب بيانات الصلاحية',
+    'permissions_fetched' => 'تم جلب الصلاحيات',
+    'permission_not_found' => 'الصلاحية غير موجودة',
+    'permission_check' => 'تم التحقق من الصلاحية',
+    'permissions_check' => 'تم التحقق من الصلاحيات',
+    'no_permission' => 'لا تملك الصلاحية',
+    'parent_permissions_fetched' => 'تم جلب الصلاحيات الرئيسية',
+    'permissions_with_menus_fetched' => 'تم جلب الصلاحيات مع القوائم',
+    'cannot_delete_permission_with_groups' => 'لا يمكن حذف صلاحية مرتبطة بمجموعات',
+    'cannot_delete_permission_with_children' => 'لا يمكن حذف صلاحية لديها صلاحيات فرعية',
+
+    // Admin Group Messages
+    'admin_group_created' => 'تم إنشاء مجموعة الإدارة',
+    'admin_group_updated' => 'تم تحديث مجموعة الإدارة',
+    'admin_group_deleted' => 'تم حذف مجموعة الإدارة',
+    'admin_group_fetched' => 'تم جلب بيانات مجموعة الإدارة',
+    'admin_groups_fetched' => 'تم جلب مجموعات الإدارة',
+    'admin_group_not_found' => 'مجموعة الإدارة غير موجودة',
+    'permissions_assigned' => 'تم تعيين الصلاحيات',
+    'admin_group_has_users' => 'لا يمكن حذف مجموعة لديها مستخدمين',
+
+    // User Messages
+    'user_created' => 'تم إنشاء المستخدم',
+    'user_updated' => 'تم تحديث المستخدم',
+    'user_deleted' => 'تم حذف المستخدم',
+    'user_fetched' => 'تم جلب بيانات المستخدم',
+    'users_fetched' => 'تم جلب المستخدمين',
+    'user_not_found' => 'المستخدم غير موجود',
+    'profile_updated' => 'تم تحديث الملف الشخصي',
+    'password_updated' => 'تم تحديث كلمة المرور',
+    'user_inactive' => 'المستخدم غير نشط',
+
+    // Activity Log Messages
+    'activity_log_created' => 'تم إنشاء سجل النشاط',
+    'activity_logs_fetched' => 'تم جلب سجلات النشاط',
+    'activity_log_not_found' => 'سجل النشاط غير موجود',
+
+    // Report Messages
+    'report_generated' => 'تم إنشاء التقرير',
+    'report_exported' => 'تم تصدير التقرير',
+    'report_not_found' => 'التقرير غير موجود',
+    'report_data_fetched' => 'تم جلب بيانات التقرير',
+
+    // Export Messages
+    'export_successful' => 'تم التصدير بنجاح',
+    'export_failed' => 'فشل التصدير',
+
+    // Notification Messages
+    'notification_sent' => 'تم إرسال الإشعار',
+    'notifications_fetched' => 'تم جلب الإشعارات',
+    'notification_marked_read' => 'تم وضع علامة مقروء على الإشعار',
+    'all_notifications_marked_read' => 'تم وضع علامة مقروء على جميع الإشعارات',
+
+    // System Messages
+    'system_healthy' => 'النظام يعمل بشكل صحيح',
+    'cache_cleared' => 'تم مسح الذاكرة المؤقتة',
+    'backup_created' => 'تم إنشاء نسخة احتياطية',
+    'settings_updated' => 'تم تحديث الإعدادات',
+
+    // Log Messages
+    'permission_created_log' => 'تم إنشاء صلاحية جديدة: :title',
+    'permission_updated_log' => 'تم تحديث الصلاحية: :title',
+    'permission_deleted_log' => 'تم حذف الصلاحية: :title',
+    'client_created_log' => 'تم إنشاء عميل جديد: :name',
+    'client_updated_log' => 'تم تحديث العميل: :name',
+    'client_deleted_log' => 'تم حذف العميل: :name',
+    'invoice_created_log' => 'تم إنشاء فاتورة جديدة: :invoice_number',
+    'invoice_updated_log' => 'تم تحديث الفاتورة: :invoice_number',
+    'invoice_deleted_log' => 'تم حذف الفاتورة: :invoice_number',
+    'invoice_sent_log' => 'تم إرسال الفاتورة: :invoice_number',
+    'invoice_paid_log' => 'تم دفع الفاتورة: :invoice_number',
+    'user_created_log' => 'تم إنشاء مستخدم جديد: :name',
+    'user_updated_log' => 'تم تحديث المستخدم: :name',
+    'user_deleted_log' => 'تم حذف المستخدم: :name',
+    'login_log' => 'تم تسجيل الدخول للمستخدم: :email',
+    'logout_log' => 'تم تسجيل الخروج للمستخدم: :email',
+
+    // Invoice messages
+    'invoices_fetched' => 'تم جلب الفواتير بنجاح',
+    'invoice_fetched' => 'تم جلب الفاتورة بنجاح',
+    'invoice_created' => 'تم إنشاء الفاتورة بنجاح',
+    'invoice_updated' => 'تم تحديث الفاتورة بنجاح',
+    'invoice_deleted' => 'تم حذف الفاتورة بنجاح',
+    'invoice_sent' => 'تم إرسال الفاتورة بنجاح',
+    'invoice_marked_paid' => 'تم تعليم الفاتورة كمدفوعة',
+    'invoice_duplicated' => 'تم نسخ الفاتورة بنجاح',
+    'pdf_generated' => 'تم إنشاء ملف PDF بنجاح',
+
+    // Dashboard messages
+    'dashboard_stats_fetched' => 'تم جلب إحصائيات الداشبورد بنجاح',
+    'recent_invoices_fetched' => 'تم جلب الفواتير الحديثة بنجاح',
+    'overdue_invoices_fetched' => 'تم جلب الفواتير المتأخرة بنجاح',
+    'monthly_revenue_fetched' => 'تم جلب الإيرادات الشهرية بنجاح',
+
+    // Calculation messages
+    'calculation_completed' => 'تمت العملية الحسابية بنجاح',
+    'calculation_failed' => 'فشلت العملية الحسابية',
+
+    // Common messages
+    'no_permission' => 'ليس لديك صلاحية للقيام بهذا الإجراء',
+    'operation_failed' => 'فشلت العملية',
+    'not_found' => 'لم يتم العثور على المطلوب',
+    'unique' => 'قيمة :attribute موجودة مسبقاً',
+    'validation_error' => 'خطأ في التحقق من البيانات',
+
+    // Status translations
+    'draft' => 'مسودة',
+    'sent' => 'مرسلة',
+    'paid' => 'مدفوعة',
+    'overdue' => 'متأخرة',
+
 ];

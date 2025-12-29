@@ -1,6 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\AuthController;
+
+
 
 /*
 |--------------------------------------------------------------------------
@@ -14,9 +17,9 @@ use Illuminate\Support\Facades\Route;
 
 // Auth Routes (Public)
 Route::prefix('admin')->group(function () {
-    Route::post('login', [\App\Http\Controllers\Admin\AuthController::class, 'login']);
-    Route::post('forgot-password', [\App\Http\Controllers\Admin\AuthController::class, 'forgotPassword']);
-    Route::post('reset-password', [\App\Http\Controllers\Admin\AuthController::class, 'resetPassword']);
+    Route::post('login', [AuthController::class, 'login']);
+    Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('reset-password', [AuthController::class, 'resetPassword']);
 });
 
 // Protected Admin Routes
@@ -31,7 +34,7 @@ Route::prefix('admin')->middleware(['auth:sanctum'])->group(function () {
     require __DIR__ . '/admin/admin-groups.php';
 
     // Auth routes inside protected group
-    Route::post('logout', [\App\Http\Controllers\Admin\AuthController::class, 'logout']);
-    Route::get('me', [\App\Http\Controllers\Admin\AuthController::class, 'me']);
-    Route::post('refresh', [\App\Http\Controllers\Admin\AuthController::class, 'refresh']);
+    Route::post('logout', [AuthController::class, 'logout']);
+    Route::get('me', [AuthController::class, 'me']);
+    Route::post('refresh', [AuthController::class, 'refresh']);
 });

@@ -1,14 +1,17 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Admin\DashboardController;
+// routes/admin/dashboard.php
 
-Route::group(['prefix' => 'dashboard'], function () {
-    Route::get('/', [DashboardController::class, 'dashboard']);
-    Route::get('/stats', [DashboardController::class, 'stats']);
-    Route::get('/monthly-revenue', [DashboardController::class, 'monthlyRevenue']);
-    Route::get('/overdue-invoices', [DashboardController::class, 'overdueInvoices']);
-    Route::get('/recent-activity', [DashboardController::class, 'recentActivity']);
-    Route::get('/recent-invoices', [DashboardController::class, 'recentInvoices']);
-    Route::get('/top-clients', [DashboardController::class, 'topClients']);
+use App\Http\Controllers\Admin\DashboardController;
+use Illuminate\Support\Facades\Route;
+
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'dashboard']);
+    Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
+    Route::get('/dashboard/monthly-revenue', [DashboardController::class, 'monthlyRevenue']);
+    Route::get('/dashboard/overdue-invoices', [DashboardController::class, 'overdueInvoices']);
+    Route::get('/dashboard/recent-activity', [DashboardController::class, 'recentActivity']);
+    Route::get('/dashboard/recent-invoices', [DashboardController::class, 'recentInvoices']);
+    Route::get('/dashboard/recent-clients', [DashboardController::class, 'recentClients']);
+    Route::post('/dashboard/report', [DashboardController::class, 'dashboardReport']);
 });

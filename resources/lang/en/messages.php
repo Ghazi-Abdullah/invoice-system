@@ -207,4 +207,171 @@ return [
     'too_many_requests' => 'Too many requests',
     'maintenance_mode' => 'System in maintenance mode',
     'service_unavailable' => 'Service unavailable',
+
+    // Success Messages
+    'success' => 'Operation completed successfully',
+    'created' => 'Created successfully',
+    'updated' => 'Updated successfully',
+    'deleted' => 'Deleted successfully',
+    'saved' => 'Saved successfully',
+    'sent' => 'Sent successfully',
+
+    // Auth Messages
+    'login_success' => 'Logged in successfully',
+    'logout_success' => 'Logged out successfully',
+    'register_success' => 'Registered successfully',
+    'login_failed' => 'Login failed',
+    'logout_failed' => 'Logout failed',
+    'user_not_found' => 'User not found',
+    'incorrect_password' => 'Incorrect password',
+    'inactive_account' => 'Account is inactive',
+    'unauthenticated' => 'Unauthenticated',
+    'unauthorized' => 'Unauthorized',
+    'forbidden' => 'Forbidden',
+    'token_refreshed' => 'Token refreshed successfully',
+    'password_changed' => 'Password changed successfully',
+
+    // Validation Messages
+    'validation_error' => 'Validation error',
+    'required_field' => 'Required field',
+    'invalid_email' => 'Invalid email',
+    'invalid_phone' => 'Invalid phone number',
+    'unique' => ':attribute already taken',
+    'exists' => ':attribute does not exist',
+    'min' => ':attribute must be at least :min',
+    'max' => ':attribute may not be greater than :max',
+    'numeric' => ':attribute must be a number',
+    'string' => ':attribute must be a string',
+    'array' => ':attribute must be an array',
+    'boolean' => ':attribute must be true or false',
+    'date' => ':attribute must be a valid date',
+    'after_or_equal' => ':attribute must be a date after or equal to :date',
+
+    // Error Messages
+    'error' => 'An error occurred',
+    'server_error' => 'Server error',
+    'not_found' => 'Not found',
+    'method_not_allowed' => 'Method not allowed',
+    'too_many_requests' => 'Too many requests',
+    'service_unavailable' => 'Service unavailable',
+    'operation_failed' => 'Operation failed',
+    'connection_error' => 'Connection error',
+    'timeout' => 'Timeout',
+
+    // Dashboard Messages
+    'dashboard_stats_fetched' => 'Dashboard statistics fetched',
+    'monthly_revenue_fetched' => 'Monthly revenue fetched',
+    'overdue_invoices_fetched' => 'Overdue invoices fetched',
+    'recent_activity_fetched' => 'Recent activity fetched',
+    'recent_invoices_fetched' => 'Recent invoices fetched',
+    'recent_clients_fetched' => 'Recent clients fetched',
+    'dashboard_data_fetched' => 'Dashboard data fetched',
+    'dashboard_report_generated' => 'Dashboard report generated',
+
+    // Client Messages
+    'client_created' => 'Client created',
+    'client_updated' => 'Client updated',
+    'client_deleted' => 'Client deleted',
+    'client_fetched' => 'Client fetched',
+    'clients_fetched' => 'Clients fetched',
+    'client_not_found' => 'Client not found',
+    'client_has_invoices' => 'Cannot delete client with invoices',
+    'email_already_registered' => 'Email already registered',
+    'client_stats_fetched' => 'Client statistics fetched',
+    'client_search_fetched' => 'Client search results fetched',
+    'client_invoices_fetched' => 'Client invoices fetched',
+
+    // Invoice Messages
+    'invoice_created' => 'Invoice created',
+    'invoice_updated' => 'Invoice updated',
+    'invoice_deleted' => 'Invoice deleted',
+    'invoice_fetched' => 'Invoice fetched',
+    'invoices_fetched' => 'Invoices fetched',
+    'invoice_not_found' => 'Invoice not found',
+    'invoice_sent' => 'Invoice sent',
+    'invoice_marked_paid' => 'Invoice marked as paid',
+    'invoice_duplicated' => 'Invoice duplicated',
+    'pdf_generated' => 'PDF generated',
+    'payment_recorded' => 'Payment recorded',
+
+    // Permission Messages
+    'permission_created' => 'Permission created',
+    'permission_updated' => 'Permission updated',
+    'permission_deleted' => 'Permission deleted',
+    'permission_fetched' => 'Permission fetched',
+    'permissions_fetched' => 'Permissions fetched',
+    'permission_not_found' => 'Permission not found',
+    'permission_check' => 'Permission checked',
+    'permissions_check' => 'Permissions checked',
+    'no_permission' => 'No permission',
+    'parent_permissions_fetched' => 'Parent permissions fetched',
+    'permissions_with_menus_fetched' => 'Permissions with menus fetched',
+    'cannot_delete_permission_with_groups' => 'Cannot delete permission assigned to groups',
+    'cannot_delete_permission_with_children' => 'Cannot delete permission with child permissions',
+
+    // Admin Group Messages
+    'admin_group_created' => 'Admin group created',
+    'admin_group_updated' => 'Admin group updated',
+    'admin_group_deleted' => 'Admin group deleted',
+    'admin_group_fetched' => 'Admin group fetched',
+    'admin_groups_fetched' => 'Admin groups fetched',
+    'admin_group_not_found' => 'Admin group not found',
+    'permissions_assigned' => 'Permissions assigned',
+    'admin_group_has_users' => 'Cannot delete group with users',
+
+    // User Messages
+    'user_created' => 'User created',
+    'user_updated' => 'User updated',
+    'user_deleted' => 'User deleted',
+    'user_fetched' => 'User fetched',
+    'users_fetched' => 'Users fetched',
+    'user_not_found' => 'User not found',
+    'profile_updated' => 'Profile updated',
+    'password_updated' => 'Password updated',
+    'user_inactive' => 'User inactive',
+
+    // Activity Log Messages
+    'activity_log_created' => 'Activity log created',
+    'activity_logs_fetched' => 'Activity logs fetched',
+    'activity_log_not_found' => 'Activity log not found',
+
+    // Report Messages
+    'report_generated' => 'Report generated',
+    'report_exported' => 'Report exported',
+    'report_not_found' => 'Report not found',
+    'report_data_fetched' => 'Report data fetched',
+
+    // Export Messages
+    'export_successful' => 'Export successful',
+    'export_failed' => 'Export failed',
+
+    // Notification Messages
+    'notification_sent' => 'Notification sent',
+    'notifications_fetched' => 'Notifications fetched',
+    'notification_marked_read' => 'Notification marked as read',
+    'all_notifications_marked_read' => 'All notifications marked as read',
+
+    // System Messages
+    'system_healthy' => 'System is healthy',
+    'cache_cleared' => 'Cache cleared',
+    'backup_created' => 'Backup created',
+    'settings_updated' => 'Settings updated',
+
+    // Log Messages
+    'permission_created_log' => 'New permission created: :title',
+    'permission_updated_log' => 'Permission updated: :title',
+    'permission_deleted_log' => 'Permission deleted: :title',
+    'client_created_log' => 'New client created: :name',
+    'client_updated_log' => 'Client updated: :name',
+    'client_deleted_log' => 'Client deleted: :name',
+    'invoice_created_log' => 'New invoice created: :invoice_number',
+    'invoice_updated_log' => 'Invoice updated: :invoice_number',
+    'invoice_deleted_log' => 'Invoice deleted: :invoice_number',
+    'invoice_sent_log' => 'Invoice sent: :invoice_number',
+    'invoice_paid_log' => 'Invoice paid: :invoice_number',
+    'user_created_log' => 'New user created: :name',
+    'user_updated_log' => 'User updated: :name',
+    'user_deleted_log' => 'User deleted: :name',
+    'login_log' => 'User logged in: :email',
+    'logout_log' => 'User logged out: :email',
 ];

@@ -1,266 +1,112 @@
 <?php
 
+// app/Http/Controllers/Admin/DashboardController.php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Client;
-use App\Models\Invoice;
-use App\Constants\Constants;
-use Carbon\Carbon;
+use App\Services\DashboardService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class DashboardController extends Controller
 {
-    public function stats()
+    protected $dashboardService;
+
+    public function __construct(DashboardService $dashboardService)
     {
-        try {
-            $totalClients = Client::active()->count();
-            $totalInvoices = Invoice::active()->count();
-            $paidInvoices = Invoice::active()->paid()->count();
-            $revenue = (float) Invoice::active()->paid()->sum('total');
-
-            $startOfMonth = Carbon::now()->startOfMonth();
-            $endOfMonth = Carbon::now()->endOfMonth();
-
-            $thisMonthInvoices = Invoice::active()
-                ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-                ->count();
-
-            $newClientsThisMonth = Client::active()
-                ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-                ->count();
-
-            $averageInvoice = $totalInvoices > 0 ? $revenue / $totalInvoices : 0;
-            $paymentRate = $totalInvoices > 0 ? ($paidInvoices / $totalInvoices) * 100 : 0;
-
-            return response()->json([
-                'status' => true,
-                'data' => [
-                    'totalClients' => $totalClients,
-                    'totalInvoices' => $totalInvoices,
-                    'paidInvoices' => $paidInvoices,
-                    'revenue' => $revenue,
-                    'thisMonthInvoices' => $thisMonthInvoices,
-                    'newClientsThisMonth' => $newClientsThisMonth,
-                    'averageInvoice' => round($averageInvoice, 2),
-                    'collectionRate' => round($paymentRate, 2),
-                    'clientsGrowth' => 0,
-                    'invoiceGrowth' => 0,
-                    'revenueGrowth' => 0,
-                    'paymentRate' => round($paymentRate, 2)
-                ]
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Dashboard stats error: ' . $e->getMessage());
-            return response()->json([
-                'status' => false,
-                'message' => 'خطأ في جلب الإحصائيات',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        $this->dashboardService = $dashboardService;
     }
 
-    public function monthlyRevenue()
+    public function dashboard(Request $request)
     {
         try {
-            $revenue = [];
+            // الحصول على المستخدم الحالي
+            $user = $request->user();
 
-            for ($i = 5; $i >= 0; $i--) {
-                $month = Carbon::now()->subMonths($i);
-                $startOfMonth = $month->copy()->startOfMonth();
-                $endOfMonth = $month->copy()->endOfMonth();
-
-                $monthRevenue = Invoice::active()
-                    ->paid()
-                    ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-                    ->sum('total');
-
-                $revenue[] = [
-                    'month' => $month->translatedFormat('M'),
-                    'revenue' => (float) $monthRevenue
-                ];
+            if (!$user) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'غير مصرح لك'
+                ], 401);
             }
 
+            // التحقق من صلاحية عرض الداشبورد
+            if (!$this->checkPermission($user, 'view_dashboard')) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'ليس لديك صلاحية لعرض لوحة التحكم'
+                ], 403);
+            }
+
+            // جلب البيانات مع فلترة حسب الصلاحيات
+            $data = $this->dashboardService->getDashboardData($user);
+
+            // إضافة معلومات المستخدم والصلاحيات
+            $data['user'] = [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'is_admin' => $user->admin_group_id == config('constants.SUPER_ADMIN_GROUP_ID'),
+                'permissions' => $this->getUserPermissions($user)
+            ];
+
             return response()->json([
                 'status' => true,
-                'data' => $revenue
+                'data' => $data
             ]);
+
         } catch (\Exception $e) {
-            \Log::error('Dashboard monthly revenue error: ' . $e->getMessage());
+            Log::error('Dashboard error: ' . $e->getMessage());
             return response()->json([
                 'status' => false,
-                'message' => 'خطأ في جلب الإيرادات الشهرية',
-                'error' => $e->getMessage()
+                'message' => 'خطأ في جلب بيانات الداشبورد',
+                'error' => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }
     }
 
-    public function overdueInvoices()
+    /**
+     * التحقق من صلاحية المستخدم
+     */
+    private function checkPermission($user, $permission)
     {
-        try {
-            $overdueInvoices = Invoice::active()
-                ->where(function($query) {
-                    $query->where('status', Constants::INVOICE_STATUS_OVERDUE)
-                          ->orWhere(function($q) {
-                              $q->where('status', Constants::INVOICE_STATUS_SENT)
-                                ->where('due_date', '<', Carbon::now());
-                          });
-                })
-                ->with(['client' => function($query) {
-                    $query->select('id', 'name');
-                }])
-                ->orderBy('due_date', 'asc')
-                ->take(10)
-                ->get()
-                ->map(function ($invoice) {
-                    return [
-                        'id' => $invoice->id,
-                        'invoice_number' => $invoice->invoice_number,
-                        'client_name' => $invoice->client ? $invoice->client->name : 'غير معروف',
-                        'due_date' => $invoice->due_date,
-                        'total' => (float) $invoice->total,
-                        'status' => $invoice->status,
-                        'days_overdue' => Carbon::parse($invoice->due_date)->diffInDays(Carbon::now())
-                    ];
-                });
-
-            return response()->json([
-                'status' => true,
-                'data' => $overdueInvoices
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Dashboard overdue invoices error: ' . $e->getMessage());
-            return response()->json([
-                'status' => false,
-                'message' => 'خطأ في جلب الفواتير المتأخرة'
-            ], 500);
+        // إذا كان مدير عام، لديه كل الصلاحيات
+        if ($user->admin_group_id == config('constants.SUPER_ADMIN_GROUP_ID')) {
+            return true;
         }
+
+        // التحقق من الصلاحية من خلال المجموعة
+        if ($user->adminGroup && $user->adminGroup->permissions) {
+            return $user->adminGroup->permissions
+                ->where('is_active', true)
+                ->where('title', $permission)
+                ->isNotEmpty();
+        }
+
+        return false;
     }
 
-    public function recentActivity()
+    /**
+     * الحصول على صلاحيات المستخدم
+     */
+    private function getUserPermissions($user)
     {
-        try {
-            // يمكنك إضافة نموذج ActivityLog لاحقاً
-            $recentActivity = [];
-
-            return response()->json([
-                'status' => true,
-                'data' => $recentActivity
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Dashboard recent activity error: ' . $e->getMessage());
-            return response()->json([
-                'status' => false,
-                'message' => 'خطأ في جلب النشاط الأخير'
-            ], 500);
+        // إذا كان مدير عام، يرجع كل الصلاحيات النشطة
+        if ($user->admin_group_id == config('constants.SUPER_ADMIN_GROUP_ID')) {
+            return \App\Models\AdminPermission::where('is_active', true)
+                ->pluck('title')
+                ->toArray();
         }
-    }
 
-    public function recentInvoices()
-    {
-        try {
-            $recentInvoices = Invoice::active()
-                ->with(['client' => function($query) {
-                    $query->select('id', 'name');
-                }])
-                ->orderBy('created_at', 'desc')
-                ->take(5)
-                ->get()
-                ->map(function ($invoice) {
-                    return [
-                        'id' => $invoice->id,
-                        'invoice_number' => $invoice->invoice_number,
-                        'client_name' => $invoice->client ? $invoice->client->name : 'غير معروف',
-                        'total' => (float) $invoice->total,
-                        'status' => $invoice->status,
-                        'due_date' => $invoice->due_date,
-                        'created_at' => $invoice->created_at
-                    ];
-                });
-
-            return response()->json([
-                'status' => true,
-                'data' => $recentInvoices
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Dashboard recent invoices error: ' . $e->getMessage());
-            return response()->json([
-                'status' => false,
-                'message' => 'خطأ في جلب الفواتير الحديثة'
-            ], 500);
+        // صلاحيات المجموعة
+        if ($user->adminGroup && $user->adminGroup->permissions) {
+            return $user->adminGroup->permissions
+                ->where('is_active', true)
+                ->pluck('title')
+                ->toArray();
         }
-    }
 
-    public function topClients()
-    {
-        try {
-            $topClients = Client::active()
-                ->withCount([
-                    'invoices' => function($query) {
-                        $query->where('status', Constants::INVOICE_STATUS_PAID);
-                    }
-                ])
-                ->withSum([
-                    'invoices' => function($query) {
-                        $query->where('status', Constants::INVOICE_STATUS_PAID);
-                    }
-                ], 'total')
-                ->orderBy('invoices_sum_total', 'desc')
-                ->take(5)
-                ->get()
-                ->map(function ($client) {
-                    return [
-                        'id' => $client->id,
-                        'name' => $client->name,
-                        'email' => $client->email,
-                        'phone' => $client->phone,
-                        'company_name' => $client->company_name,
-                        'paid_invoices_count' => (int) $client->invoices_count,
-                        'total_spent' => (float) $client->invoices_sum_total,
-                        'created_at' => $client->created_at
-                    ];
-                });
-
-            return response()->json([
-                'status' => true,
-                'data' => $topClients
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Dashboard top clients error: ' . $e->getMessage());
-            return response()->json([
-                'status' => false,
-                'message' => 'خطأ في جلب العملاء'
-            ], 500);
-        }
-    }
-
-    // دالة تجلب جميع بيانات الداشبورد في استجابة واحدة
-    public function dashboard()
-    {
-        try {
-            $stats = $this->stats()->getData();
-            $recentInvoices = $this->recentInvoices()->getData();
-            $topClients = $this->topClients()->getData();
-            $monthlyRevenue = $this->monthlyRevenue()->getData();
-            $overdueInvoices = $this->overdueInvoices()->getData();
-            $recentActivity = $this->recentActivity()->getData();
-
-            return response()->json([
-                'status' => true,
-                'data' => [
-                    'stats' => $stats->status ? $stats->data : [],
-                    'recentInvoices' => $recentInvoices->status ? $recentInvoices->data : [],
-                    'recentClients' => $topClients->status ? $topClients->data : [],
-                    'monthlyRevenue' => $monthlyRevenue->status ? $monthlyRevenue->data : [],
-                    'overdueInvoices' => $overdueInvoices->status ? $overdueInvoices->data : [],
-                    'recentActivity' => $recentActivity->status ? $recentActivity->data : []
-                ]
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Dashboard all data error: ' . $e->getMessage());
-            return response()->json([
-                'status' => false,
-                'message' => 'خطأ في جلب بيانات الداشبورد'
-            ], 500);
-        }
+        return [];
     }
 }

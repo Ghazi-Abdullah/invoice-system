@@ -32,10 +32,8 @@ class AuthController extends Controller
                 );
             }
 
-            // Find user by email
             $user = User::with(['adminGroup.permissions'])->where('email', $request->email)->first();
 
-            // Check if user exists
             if (!$user) {
                 return $this->failureResponse(
                     __('messages.user_not_found'),
@@ -44,7 +42,6 @@ class AuthController extends Controller
                 );
             }
 
-            // Check if password is correct
             if (!Hash::check($request->password, $user->password)) {
                 return $this->failureResponse(
                     __('messages.incorrect_password'),
@@ -53,7 +50,6 @@ class AuthController extends Controller
                 );
             }
 
-            // Check if user is active
             if (!$user->is_active) {
                 return $this->failureResponse(
                     __('messages.inactive_account'),
@@ -62,14 +58,11 @@ class AuthController extends Controller
                 );
             }
 
-            // Get user permissions
             $permissions = $this->getUserPermissions($user);
             $is_admin = $user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID;
 
-            // Create token
             $token = $user->createToken('invoice-system-token')->plainTextToken;
 
-            // Return response
             return $this->successResponse(
                 __('messages.login_success'),
                 [
@@ -81,6 +74,7 @@ class AuthController extends Controller
                         'company_name' => $user->company_name,
                         'admin_group_id' => $user->admin_group_id,
                         'is_active' => $user->is_active,
+                        'is_admin' => $is_admin,
                         'adminGroup' => $user->adminGroup,
                     ],
                     'token' => $token,
@@ -106,7 +100,6 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         try {
-            // Revoke the token that was used to authenticate the current request
             $request->user()->currentAccessToken()->delete();
 
             return $this->successResponse(__('messages.logout_success'), null);
@@ -134,10 +127,8 @@ class AuthController extends Controller
                 );
             }
 
-            // Load relationships
             $user->load(['adminGroup.permissions']);
 
-            // Get permissions
             $permissions = $this->getUserPermissions($user);
             $is_admin = $user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID;
 
@@ -152,6 +143,7 @@ class AuthController extends Controller
                         'company_name' => $user->company_name,
                         'admin_group_id' => $user->admin_group_id,
                         'is_active' => $user->is_active,
+                        'is_admin' => $is_admin,
                         'adminGroup' => $user->adminGroup,
                     ],
                     'permissions' => $permissions,
@@ -182,10 +174,8 @@ class AuthController extends Controller
                 );
             }
 
-            // Revoke current token
             $request->user()->currentAccessToken()->delete();
 
-            // Create new token
             $token = $user->createToken('invoice-system-token')->plainTextToken;
 
             return $this->successResponse(
@@ -221,8 +211,6 @@ class AuthController extends Controller
                 );
             }
 
-            // TODO: Implement password reset logic
-
             return $this->successResponse(__('messages.success'), null);
 
         } catch (\Exception $e) {
@@ -252,8 +240,6 @@ class AuthController extends Controller
                 );
             }
 
-            // TODO: Implement password reset logic
-
             return $this->successResponse(__('messages.password_changed'), null);
 
         } catch (\Exception $e) {
@@ -272,14 +258,12 @@ class AuthController extends Controller
     private function getUserPermissions(User $user)
     {
         try {
-            // If user is Super Admin (group_id = 1), get ALL permissions
             if ($user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID) {
                 return AdminPermission::where('is_active', true)
                     ->pluck('title')
                     ->toArray();
             }
 
-            // For other users, get permissions from their admin group
             if ($user->adminGroup && $user->adminGroup->permissions) {
                 return $user->adminGroup->permissions
                     ->where('is_active', true)
@@ -293,5 +277,98 @@ class AuthController extends Controller
             Log::error('Get user permissions error: ' . $e->getMessage());
             return [];
         }
+    }
+
+    /**
+     * Check if user has specific permission
+     */
+    public function checkPermission(Request $request, $permission)
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return $this->failureResponse(
+                    __('messages.unauthenticated'),
+                    null,
+                    Constants::RESPONSE_UNAUTHORIZED
+                );
+            }
+
+            $hasPermission = $this->hasPermission($user, $permission);
+
+            return $this->successResponse(
+                __('messages.permission_check'),
+                [
+                    'has_permission' => $hasPermission,
+                    'permission' => $permission
+                ]
+            );
+
+        } catch (\Exception $e) {
+            Log::error('Check permission error: ' . $e->getMessage());
+            return $this->failureResponse(
+                __('messages.error') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
+        }
+    }
+
+    /**
+     * Check user permissions in batch
+     */
+    public function checkPermissionsBatch(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return $this->failureResponse(
+                    __('messages.unauthenticated'),
+                    null,
+                    Constants::RESPONSE_UNAUTHORIZED
+                );
+            }
+
+            $permissions = $request->input('permissions', []);
+            $results = [];
+
+            foreach ($permissions as $permission) {
+                $results[$permission] = $this->hasPermission($user, $permission);
+            }
+
+            return $this->successResponse(
+                __('messages.permissions_check'),
+                ['permissions' => $results]
+            );
+
+        } catch (\Exception $e) {
+            Log::error('Check permissions batch error: ' . $e->getMessage());
+            return $this->failureResponse(
+                __('messages.error') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
+        }
+    }
+
+    /**
+     * Helper method to check permission
+     */
+    private function hasPermission(User $user, string $permission): bool
+    {
+        if ($user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID) {
+            return true;
+        }
+
+        if ($user->adminGroup && $user->adminGroup->permissions) {
+            return $user->adminGroup->permissions
+                ->where('is_active', true)
+                ->where('title', $permission)
+                ->isNotEmpty();
+        }
+
+        return false;
     }
 }
