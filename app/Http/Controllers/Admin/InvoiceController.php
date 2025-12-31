@@ -11,7 +11,13 @@ use App\Http\Requests\Admin\Invoice\StoreInvoiceRequest;
 use App\Http\Requests\Admin\Invoice\UpdateInvoiceRequest;
 use App\Http\Requests\Admin\Invoice\SendInvoiceRequest;
 use App\Http\Requests\Admin\Invoice\MarkAsPaidRequest;
+use App\Models\Invoice;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+
 
 class InvoiceController extends Controller
 {
@@ -175,7 +181,7 @@ class InvoiceController extends Controller
         return $this->failureResponse($sendData['message'], $sendData['data']);
     }
 
-    public function markAsPaid(MarkAsPaidRequest $request, $id)
+    /*public function markAsPaid(MarkAsPaidRequest $request, $id)
     {
         if (!PermissionHelper::checkPermission(Constants::EDIT_INVOICE)) {
             return $this->failureResponse(
@@ -185,13 +191,15 @@ class InvoiceController extends Controller
             );
         }
 
+        // الحصول على بيانات الفاتورة
         $data = $this->invoice->show($id);
 
         if (!$data['status']) {
             return $this->failureResponse($data['message'], $data['data']);
         }
 
-        $paidData = $this->invoice->markAsPaid($data['data']);
+        // استدعاء دالة markAsPaid من الـ Repository مع المعلمات الصحيحة
+        $paidData = $this->invoice->markAsPaid($request, $data['data']);
 
         if ($paidData['status']) {
             return $this->successResponse(
@@ -201,6 +209,77 @@ class InvoiceController extends Controller
         }
 
         return $this->failureResponse($paidData['message'], $paidData['data']);
+    }*/
+
+    public function markAsPaid(Request $request, $id)
+    {
+        if (!PermissionHelper::checkPermission(Constants::EDIT_INVOICE)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // العثور على الفاتورة مباشرة
+            $invoice = Invoice::find($id);
+
+            if (!$invoice) {
+                return $this->failureResponse(
+                    __('messages.invoice_not_found'),
+                    null,
+                    Constants::RESPONSE_NOT_FOUND
+                );
+            }
+
+            // التحقق من أن الفاتورة ليست مدفوعة مسبقًا
+            if ($invoice->status === 'paid') {
+                return $this->failureResponse(
+                    __('messages.invoice_already_paid'),
+                    null,
+                    Constants::RESPONSE_BAD_REQUEST
+                );
+            }
+
+            // الحصول على تاريخ الدفع من الطلب أو استخدام التاريخ الحالي
+            $paymentDate = $request->has('payment_date')
+                ? $request->payment_date
+                : now()->format('Y-m-d');
+
+            // تحديث الفاتورة
+            $invoice->update([
+                'status' => 'paid',
+                'payment_date' => $paymentDate,
+                'paid_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            // تسجيل النشاط
+           ActivityLog::log(
+                'UPDATE',
+                'تم تحديث حالة الفاتورة #' . $invoice->invoice_number . ' إلى "تم الدفع"',
+                $invoice
+            );
+
+            DB::commit();
+
+            return $this->successResponse(
+                __('messages.invoice_marked_paid'),
+                $invoice->load(['client', 'items'])
+            );
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('InvoiceController simpleMarkAsPaid error: ' . $e->getMessage());
+
+            return $this->failureResponse(
+                __('messages.operation_failed') . ': ' . $e->getMessage(),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
+        }
     }
 
     public function duplicate($id)

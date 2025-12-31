@@ -8,6 +8,8 @@ use App\Models\ActivityLog;
 use App\Constants\Constants;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+
 
 class InvoiceRepository implements InvoiceInterface
 {
@@ -372,33 +374,81 @@ class InvoiceRepository implements InvoiceInterface
         }
     }
 
-    public function markAsPaid($invoice)
-    {
-        try {
-            $invoice->markAsPaid();
+   public function markAsPaid($request, $invoice)
+{
+    DB::beginTransaction();
 
-            ActivityLog::log(
-                'UPDATE',
-                __('messages.invoice_marked_paid') . ': ' . $invoice->invoice_number,
-                $invoice
-            );
+    try {
+        $oldValues = $invoice->toArray();
 
-            return [
-                'status' => true,
-                'message' => __('messages.invoice_marked_paid'),
-                'data' => $invoice->load(['client', 'items', 'createdBy'])
-            ];
-
-        } catch (\Exception $e) {
-            Log::error('InvoiceRepository markAsPaid error: ' . $e->getMessage());
-
+        // التحقق من أن الفاتورة ليست مدفوعة مسبقًا
+        if ($invoice->status === Constants::INVOICE_STATUS_PAID) {
             return [
                 'status' => false,
-                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
+                'message' => __('messages.invoice_already_paid'),
                 'data' => null
             ];
         }
+
+        // الحصول على تاريخ الدفع (إذا كان موجوداً في الطلب)
+        $paymentDate = null;
+
+        // تحقق من نوع $request
+        if ($request instanceof \Illuminate\Http\Request) {
+            $paymentDate = $request->input('payment_date');
+        } elseif (is_array($request)) {
+            $paymentDate = $request['payment_date'] ?? null;
+        } elseif (is_object($request) && property_exists($request, 'payment_date')) {
+            $paymentDate = $request->payment_date;
+        }
+
+        // إذا لم يتم توفير تاريخ، استخدم التاريخ الحالي
+        if (!$paymentDate) {
+            $paymentDate = now()->format('Y-m-d');
+        }
+
+        // تحديث الفاتورة
+        $updateData = [
+            'status' => Constants::INVOICE_STATUS_PAID,
+            'paid_at' => now(),
+        ];
+
+        // إذا كان جدول الفواتير يحتوي على حقل payment_date، أضفه
+        if (Schema::hasColumn('invoices', 'payment_date')) {
+            $updateData['payment_date'] = $paymentDate;
+        }
+
+        $invoice->update($updateData);
+
+        // تسجيل النشاط
+        ActivityLog::log(
+            'UPDATE',
+            __('messages.invoice_marked_paid') . ': #' . $invoice->invoice_number,
+            $invoice,
+            $oldValues,
+            $invoice->fresh()->toArray()
+        );
+
+        DB::commit();
+
+        return [
+            'status' => true,
+            'message' => __('messages.invoice_marked_paid'),
+            'data' => $invoice->load(['client', 'items'])
+        ];
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('InvoiceRepository markAsPaid error: ' . $e->getMessage());
+        Log::error('Stack trace: ' . $e->getTraceAsString());
+
+        return [
+            'status' => false,
+            'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
+            'data' => null
+        ];
     }
+}
 
     public function duplicate($invoice)
     {

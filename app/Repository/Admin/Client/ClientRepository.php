@@ -23,11 +23,11 @@ class ClientRepository implements ClientInterface
             }
 
             if ($request->has('search') && !empty($request->search)) {
-                $query->where(function($q) use ($request) {
+                $query->where(function ($q) use ($request) {
                     $q->where('name', 'like', "%{$request->search}%")
-                      ->orWhere('email', 'like', "%{$request->search}%")
-                      ->orWhere('company_name', 'like', "%{$request->search}%")
-                      ->orWhere('phone', 'like', "%{$request->search}%");
+                        ->orWhere('email', 'like', "%{$request->search}%")
+                        ->orWhere('company_name', 'like', "%{$request->search}%")
+                        ->orWhere('phone', 'like', "%{$request->search}%");
                 });
             }
 
@@ -55,7 +55,6 @@ class ClientRepository implements ClientInterface
                 'message' => __('messages.clients_fetched'),
                 'data' => $clients
             ];
-
         } catch (\Exception $e) {
             Log::error('ClientRepository index error: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
@@ -92,7 +91,6 @@ class ClientRepository implements ClientInterface
                 'message' => __('messages.client_fetched'),
                 'data' => $client
             ];
-
         } catch (\Exception $e) {
             Log::error('ClientRepository show error: ' . $e->getMessage());
 
@@ -148,7 +146,6 @@ class ClientRepository implements ClientInterface
                 'message' => __('messages.client_created'),
                 'data' => $client->load(['user'])
             ];
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('ClientRepository store error: ' . $e->getMessage());
@@ -183,20 +180,34 @@ class ClientRepository implements ClientInterface
                 }
             }
 
-            // تحديث بيانات العميل
-            $updateData = [
-                'name' => $request->name ?? $client->name,
-                'email' => $request->email ?? $client->email,
-                'phone' => $request->phone ?? $client->phone,
-                'address' => $request->address ?? $client->address,
-                'company_name' => $request->company_name ?? $client->company_name,
-                'tax_number' => $request->tax_number ?? $client->tax_number,
-                'payment_terms' => $request->payment_terms ?? $client->payment_terms,
-                'currency' => $request->currency ?? $client->currency,
-                'notes' => $request->notes ?? $client->notes,
-                'is_active' => $request->has('is_active') ? (bool)$request->is_active : $client->is_active
+            // الحقول المسموح بتحديثها فقط
+            $allowedFields = [
+                'name',
+                'email',
+                'phone',
+                'address',
+                'company_name',
+                'tax_number',
+                'payment_terms',
+                'currency',
+                'notes',
+                'is_active'
             ];
 
+            // إنشاء array للبيانات المسموح بها فقط
+            $updateData = [];
+            foreach ($allowedFields as $field) {
+                if ($request->has($field)) {
+                    $updateData[$field] = $request->$field;
+                }
+            }
+
+            // تحويل is_active إلى boolean إذا كان موجوداً
+            if (isset($updateData['is_active'])) {
+                $updateData['is_active'] = (bool)$updateData['is_active'];
+            }
+
+            // تحديث البيانات
             $client->update($updateData);
 
             // تسجيل النشاط
@@ -210,15 +221,22 @@ class ClientRepository implements ClientInterface
 
             DB::commit();
 
+            // إعادة تحميل العميل مع الإحصائيات المحسوبة (فقط للعرض)
+            $client->load(['user', 'invoices']);
+            $client->invoices_count = $client->invoices()->count();
+            $client->total_invoiced = $client->invoices()->sum('total');
+            $client->total_paid = $client->invoices()->where('status', Constants::INVOICE_STATUS_PAID)->sum('total');
+            $client->total_due = $client->total_invoiced - $client->total_paid;
+
             return [
                 'status' => true,
                 'message' => __('messages.client_updated'),
-                'data' => $client->load(['user'])
+                'data' => $client
             ];
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('ClientRepository update error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
 
             return [
                 'status' => false,
@@ -262,7 +280,6 @@ class ClientRepository implements ClientInterface
                 'message' => __('messages.client_deleted'),
                 'data' => ['id' => $clientId]
             ];
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('ClientRepository destroy error: ' . $e->getMessage());
@@ -304,7 +321,6 @@ class ClientRepository implements ClientInterface
                 'message' => __('messages.client_stats_fetched'),
                 'data' => $stats
             ];
-
         } catch (\Exception $e) {
             Log::error('ClientRepository getClientStats error: ' . $e->getMessage());
 
@@ -333,7 +349,6 @@ class ClientRepository implements ClientInterface
                 'message' => __('messages.client_search_fetched'),
                 'data' => $clients
             ];
-
         } catch (\Exception $e) {
             Log::error('ClientRepository searchClients error: ' . $e->getMessage());
 
@@ -357,7 +372,6 @@ class ClientRepository implements ClientInterface
                 'message' => __('messages.client_invoices_fetched'),
                 'data' => $invoices
             ];
-
         } catch (\Exception $e) {
             Log::error('ClientRepository getClientInvoices error: ' . $e->getMessage());
 
