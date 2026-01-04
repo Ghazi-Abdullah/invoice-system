@@ -19,7 +19,8 @@ class MarkAsPaidRequest extends FormRequest
     public function rules()
     {
         return [
-            'payment_date' => 'required|date',
+            'payment_date' => 'nullable|date|before_or_equal:today',
+            //'payment_date' => 'required|date',
             'payment_method' => 'nullable|string|max:255',
             'reference' => 'nullable|string|max:255',
             'notes' => 'nullable|string',

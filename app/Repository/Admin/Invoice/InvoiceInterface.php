@@ -10,7 +10,7 @@ interface InvoiceInterface
     public function update($request, $invoice);
     public function destroy($invoice);
     public function sendInvoice($invoice);
-    public function markAsPaid($invoice);
+    public function markAsPaid($invoice,$request);
     public function duplicate($invoice);
     public function generatePDF($invoice);
     public function getDashboardStats();

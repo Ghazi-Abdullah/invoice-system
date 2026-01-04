@@ -11,7 +11,7 @@ class Client extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name',
+       'name',
         'email',
         'phone',
         'address',
@@ -26,6 +26,13 @@ class Client extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'id',
+        'invoices_count',
+        'total_invoiced',
+        'total_paid',
+        'total_due',
+        'created_at',
+        'updated_at'
     ];
 
     // Scopes

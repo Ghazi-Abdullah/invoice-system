@@ -1,12 +1,15 @@
 <?php
-// app/Repository/Admin/Report/ReportInterface.php
+
 namespace App\Repository\Admin\Report;
 
 interface ReportInterface
 {
-    public function invoiceReport($filters = []);
-    public function clientReport($filters = []);
-    public function revenueReport($filters = []);
-    public function overdueReport($filters = []);
-    public function exportReport($type, $filters = []);
+    public function getInvoiceReport(array $filters = []): array;
+    public function getClientReport(array $filters = []): array;
+    public function getRevenueReport(array $filters = []): array;
+    public function getOverdueReport(array $filters = []): array;
+    public function getDashboardStats(): array;
+    public function exportReport(string $type, array $filters = []): array;
+    public function sendInvoiceReminder(int $invoiceId): array;
+    public function markInvoiceAsPaid(int $invoiceId): array;
 }

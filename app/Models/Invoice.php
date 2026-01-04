@@ -12,6 +12,7 @@ class Invoice extends Model
 
     protected $fillable = [
         'client_id',
+        'user_id', // تمت إضافته
         'invoice_number',
         'invoice_date',
         'due_date',
@@ -89,6 +90,11 @@ class Invoice extends Model
     public function client()
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function user() // تمت إضافته
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function items()
