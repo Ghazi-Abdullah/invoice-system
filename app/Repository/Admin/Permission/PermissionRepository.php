@@ -13,8 +13,6 @@ class PermissionRepository implements PermissionInterface
     public function index($request)
     {
         try {
-            Log::info('Starting permission index method');
-
             $query = AdminPermission::with(['menu', 'subMenu', 'parent']);
 
             // Apply search filter
@@ -37,15 +35,11 @@ class PermissionRepository implements PermissionInterface
             $perPage = min($perPage, Constants::MAX_PER_PAGE);
             $perPage = max($perPage, Constants::MIN_PER_PAGE);
 
-            Log::info('Before pagination', ['perPage' => $perPage]);
-
             $permissions = $query->orderBy('admin_menu_id')
                 ->orderBy('admin_sub_menu_id')
                 ->orderBy('parent_id')
                 ->orderBy('title')
                 ->paginate($perPage);
-
-            Log::info('Permissions retrieved', ['count' => $permissions->count()]);
 
             return [
                 'status' => true,
@@ -55,11 +49,10 @@ class PermissionRepository implements PermissionInterface
 
         } catch (\Exception $e) {
             Log::error('PermissionRepository index error: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
 
             return [
                 'status' => false,
-                'message' => __('messages.error') . ': ' . $e->getMessage(),
+                'message' => __('messages.error_occurred'),
                 'data' => null
             ];
         }
@@ -89,7 +82,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => __('messages.error') . ': ' . $e->getMessage(),
+                'message' => __('messages.error_occurred'),
                 'data' => null
             ];
         }
@@ -103,6 +96,7 @@ class PermissionRepository implements PermissionInterface
             // Check if permission title is unique
             $existingPermission = AdminPermission::where('title', $request->title)->first();
             if ($existingPermission) {
+                DB::rollBack();
                 return [
                     'status' => false,
                     'message' => __('messages.unique', ['attribute' => __('validation.attributes.title')]),
@@ -143,7 +137,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
+                'message' => __('messages.operation_failed'),
                 'data' => null
             ];
         }
@@ -163,6 +157,7 @@ class PermissionRepository implements PermissionInterface
                     ->first();
 
                 if ($existingPermission) {
+                    DB::rollBack();
                     return [
                         'status' => false,
                         'message' => __('messages.unique', ['attribute' => __('validation.attributes.title')]),
@@ -208,7 +203,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
+                'message' => __('messages.operation_failed'),
                 'data' => null
             ];
         }
@@ -224,6 +219,7 @@ class PermissionRepository implements PermissionInterface
 
             // Check if permission is assigned to any groups
             if ($permission->groups()->count() > 0) {
+                DB::rollBack();
                 return [
                     'status' => false,
                     'message' => __('messages.cannot_delete_permission_with_groups'),
@@ -233,6 +229,7 @@ class PermissionRepository implements PermissionInterface
 
             // Check if permission has children
             if ($permission->children()->count() > 0) {
+                DB::rollBack();
                 return [
                     'status' => false,
                     'message' => __('messages.cannot_delete_permission_with_children'),
@@ -264,7 +261,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
+                'message' => __('messages.operation_failed'),
                 'data' => null
             ];
         }
@@ -288,7 +285,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => __('messages.error') . ': ' . $e->getMessage(),
+                'message' => __('messages.error_occurred'),
                 'data' => null
             ];
         }
@@ -336,17 +333,16 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => true,
-                'message' => __('messages.permissions_with_menus_fetched'),
+                'message' => __('messages.permissions_fetched'),
                 'data' => $formattedPermissions
             ];
 
         } catch (\Exception $e) {
             Log::error('PermissionRepository getPermissionsWithMenus error: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
 
             return [
                 'status' => false,
-                'message' => __('messages.error') . ': ' . $e->getMessage(),
+                'message' => __('messages.error_occurred'),
                 'data' => null
             ];
         }
@@ -371,7 +367,7 @@ class PermissionRepository implements PermissionInterface
 
             return [
                 'status' => false,
-                'message' => __('messages.error') . ': ' . $e->getMessage(),
+                'message' => __('messages.error_occurred'),
                 'data' => null
             ];
         }

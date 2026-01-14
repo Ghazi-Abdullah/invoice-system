@@ -34,12 +34,12 @@ class InvoiceRepository implements InvoiceInterface
 
             if ($request->has('search') && !empty($request->search)) {
                 $search = $request->search;
-                $query->where(function($q) use ($search) {
+                $query->where(function ($q) use ($search) {
                     $q->where('invoice_number', 'like', "%{$search}%")
-                      ->orWhereHas('client', function($client) use ($search) {
-                          $client->where('name', 'like', "%{$search}%")
-                                 ->orWhere('company_name', 'like', "%{$search}%");
-                      });
+                        ->orWhereHas('client', function ($client) use ($search) {
+                            $client->where('name', 'like', "%{$search}%")
+                                ->orWhere('company_name', 'like', "%{$search}%");
+                        });
                 });
             }
 
@@ -55,7 +55,6 @@ class InvoiceRepository implements InvoiceInterface
                 'message' => __('messages.invoices_fetched'),
                 'data' => $invoices
             ];
-
         } catch (\Exception $e) {
             Log::error('InvoiceRepository index error: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
@@ -86,7 +85,6 @@ class InvoiceRepository implements InvoiceInterface
                 'message' => __('messages.invoice_fetched'),
                 'data' => $invoice
             ];
-
         } catch (\Exception $e) {
             Log::error('InvoiceRepository show error: ' . $e->getMessage());
 
@@ -126,7 +124,7 @@ class InvoiceRepository implements InvoiceInterface
             $discountAmount = $request->discount_amount ?? 0;
             $total = $subtotal + $taxAmount - $discountAmount;
 
-            // إنشاء الفاتورة
+            // إنشاء الفاتورة مع حقل enable_stripe_checkout
             $invoice = Invoice::create([
                 'client_id' => $request->client_id,
                 'invoice_number' => $invoiceNumber,
@@ -139,6 +137,7 @@ class InvoiceRepository implements InvoiceInterface
                 'total' => $total,
                 'currency' => $request->currency ?? Constants::CURRENCY_SAR,
                 'notes' => $request->notes ?? null,
+                'enable_stripe_checkout' => $request->enable_stripe_checkout ?? false, // إضافة الحقل الجديد
                 'terms' => $request->terms ?? null,
                 'footer' => $request->footer ?? null,
                 'created_by' => auth()->id() ?? 1,
@@ -171,6 +170,18 @@ class InvoiceRepository implements InvoiceInterface
                 }
             }
 
+            // إذا كان Stripe Checkout مفعلاً، أنشئ جلسة دفع
+            if ($request->enable_stripe_checkout && $invoice->status !== 'paid') {
+                $stripeSession = $this->createStripeCheckoutSession($invoice);
+                if ($stripeSession) {
+                    Log::info('Stripe Checkout Session created for invoice', [
+                        'invoice_id' => $invoice->id,
+                        'session_id' => $stripeSession->id,
+                        'checkout_url' => $stripeSession->url
+                    ]);
+                }
+            }
+
             // تسجيل النشاط
             ActivityLog::log(
                 'CREATE',
@@ -185,16 +196,62 @@ class InvoiceRepository implements InvoiceInterface
                 'message' => __('messages.invoice_created'),
                 'data' => $invoice->load(['client', 'items', 'createdBy'])
             ];
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('InvoiceRepository store error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
 
             return [
                 'status' => false,
                 'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
+        }
+    }
+
+    /**
+     * إنشاء جلسة Stripe Checkout
+     */
+    private function createStripeCheckoutSession($invoice)
+    {
+        try {
+            // تأكد من تثبيت حزمة Stripe أولاً
+            if (!class_exists('\Stripe\Stripe')) {
+                Log::error('Stripe PHP library not installed');
+                return null;
+            }
+
+            \Stripe\Stripe::setApiKey(env('STRIPE_SECRET'));
+
+            // إنشاء جلسة Stripe
+            $checkoutSession = \Stripe\Checkout\Session::create([
+                'payment_method_types' => ['card'],
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => strtolower($invoice->currency ?? 'sar'),
+                        'product_data' => [
+                            'name' => 'فاتورة #' . $invoice->invoice_number,
+                            'description' => 'فاتورة من ' . ($invoice->client->company_name ?: $invoice->client->name),
+                        ],
+                        'unit_amount' => (int)($invoice->total * 100),
+                    ],
+                    'quantity' => 1,
+                ]],
+                'mode' => 'payment',
+                'success_url' => env('FRONTEND_URL') . '/invoices/' . $invoice->id . '?payment_success=true&session_id={CHECKOUT_SESSION_ID}',
+                'cancel_url' => env('FRONTEND_URL') . '/invoices/' . $invoice->id . '?payment_cancelled=true',
+                'customer_email' => $invoice->client->email,
+                'metadata' => [
+                    'invoice_id' => $invoice->id,
+                    'invoice_number' => $invoice->invoice_number,
+                    'client_id' => $invoice->client_id,
+                ],
+            ]);
+
+            return $checkoutSession;
+        } catch (\Exception $e) {
+            Log::error('Failed to create Stripe Checkout Session: ' . $e->getMessage());
+            return null;
         }
     }
 
@@ -292,7 +349,6 @@ class InvoiceRepository implements InvoiceInterface
                 'message' => __('messages.invoice_updated'),
                 'data' => $invoice->load(['client', 'items', 'createdBy'])
             ];
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('InvoiceRepository update error: ' . $e->getMessage());
@@ -333,7 +389,6 @@ class InvoiceRepository implements InvoiceInterface
                 'message' => __('messages.invoice_deleted'),
                 'data' => ['id' => $invoiceId]
             ];
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('InvoiceRepository destroy error: ' . $e->getMessage());
@@ -362,7 +417,6 @@ class InvoiceRepository implements InvoiceInterface
                 'message' => __('messages.invoice_sent'),
                 'data' => $invoice->load(['client', 'items', 'createdBy'])
             ];
-
         } catch (\Exception $e) {
             Log::error('InvoiceRepository sendInvoice error: ' . $e->getMessage());
 
@@ -375,80 +429,80 @@ class InvoiceRepository implements InvoiceInterface
     }
 
    public function markAsPaid($request, $invoice)
-{
-    DB::beginTransaction();
+    {
+        DB::beginTransaction();
 
-    try {
-        $oldValues = $invoice->toArray();
+        try {
+            $oldValues = $invoice->toArray();
 
-        // التحقق من أن الفاتورة ليست مدفوعة مسبقًا
-        if ($invoice->status === Constants::INVOICE_STATUS_PAID) {
+            // التحقق من أن الفاتورة ليست مدفوعة مسبقًا
+            if ($invoice->status === Constants::INVOICE_STATUS_PAID) {
+                return [
+                    'status' => false,
+                    'message' => __('messages.invoice_already_paid'),
+                    'data' => null
+                ];
+            }
+
+            // الحصول على تاريخ الدفع (إذا كان موجوداً في الطلب)
+            $paymentDate = null;
+
+            // تحقق من نوع $request
+            if ($request instanceof \Illuminate\Http\Request) {
+                $paymentDate = $request->input('payment_date');
+            } elseif (is_array($request)) {
+                $paymentDate = $request['payment_date'] ?? null;
+            } elseif (is_object($request) && property_exists($request, 'payment_date')) {
+                $paymentDate = $request->payment_date;
+            }
+
+            // إذا لم يتم توفير تاريخ، استخدم التاريخ الحالي
+            if (!$paymentDate) {
+                $paymentDate = now()->format('Y-m-d');
+            }
+
+            // تحديث الفاتورة
+            $updateData = [
+                'status' => Constants::INVOICE_STATUS_PAID,
+                'paid_at' => now(),
+            ];
+
+            // إذا كان جدول الفواتير يحتوي على حقل payment_date، أضفه
+            if (Schema::hasColumn('invoices', 'payment_date')) {
+                $updateData['payment_date'] = $paymentDate;
+            }
+
+            $invoice->update($updateData);
+
+            // تسجيل النشاط
+            ActivityLog::log(
+                'UPDATE',
+                __('messages.invoice_marked_paid') . ': #' . $invoice->invoice_number,
+                $invoice,
+                $oldValues,
+                $invoice->fresh()->toArray()
+            );
+
+            DB::commit();
+
+            return [
+                'status' => true,
+                'message' => __('messages.invoice_marked_paid'),
+                'data' => $invoice->load(['client', 'items'])
+            ];
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('InvoiceRepository markAsPaid error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+
             return [
                 'status' => false,
-                'message' => __('messages.invoice_already_paid'),
+                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
                 'data' => null
             ];
         }
-
-        // الحصول على تاريخ الدفع (إذا كان موجوداً في الطلب)
-        $paymentDate = null;
-
-        // تحقق من نوع $request
-        if ($request instanceof \Illuminate\Http\Request) {
-            $paymentDate = $request->input('payment_date');
-        } elseif (is_array($request)) {
-            $paymentDate = $request['payment_date'] ?? null;
-        } elseif (is_object($request) && property_exists($request, 'payment_date')) {
-            $paymentDate = $request->payment_date;
-        }
-
-        // إذا لم يتم توفير تاريخ، استخدم التاريخ الحالي
-        if (!$paymentDate) {
-            $paymentDate = now()->format('Y-m-d');
-        }
-
-        // تحديث الفاتورة
-        $updateData = [
-            'status' => Constants::INVOICE_STATUS_PAID,
-            'paid_at' => now(),
-        ];
-
-        // إذا كان جدول الفواتير يحتوي على حقل payment_date، أضفه
-        if (Schema::hasColumn('invoices', 'payment_date')) {
-            $updateData['payment_date'] = $paymentDate;
-        }
-
-        $invoice->update($updateData);
-
-        // تسجيل النشاط
-        ActivityLog::log(
-            'UPDATE',
-            __('messages.invoice_marked_paid') . ': #' . $invoice->invoice_number,
-            $invoice,
-            $oldValues,
-            $invoice->fresh()->toArray()
-        );
-
-        DB::commit();
-
-        return [
-            'status' => true,
-            'message' => __('messages.invoice_marked_paid'),
-            'data' => $invoice->load(['client', 'items'])
-        ];
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('InvoiceRepository markAsPaid error: ' . $e->getMessage());
-        Log::error('Stack trace: ' . $e->getTraceAsString());
-
-        return [
-            'status' => false,
-            'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
-            'data' => null
-        ];
     }
-}
 
     public function duplicate($invoice)
     {
@@ -485,7 +539,6 @@ class InvoiceRepository implements InvoiceInterface
                 'message' => __('messages.invoice_duplicated'),
                 'data' => $newInvoice->load(['client', 'items', 'createdBy'])
             ];
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('InvoiceRepository duplicate error: ' . $e->getMessage());
@@ -513,7 +566,6 @@ class InvoiceRepository implements InvoiceInterface
                     'file_name' => 'invoice_' . $invoice->invoice_number . '.pdf'
                 ]
             ];
-
         } catch (\Exception $e) {
             Log::error('InvoiceRepository generatePDF error: ' . $e->getMessage());
 
@@ -550,7 +602,6 @@ class InvoiceRepository implements InvoiceInterface
                 'message' => __('messages.dashboard_stats_fetched'),
                 'data' => $stats
             ];
-
         } catch (\Exception $e) {
             Log::error('InvoiceRepository getDashboardStats error: ' . $e->getMessage());
 
@@ -575,7 +626,6 @@ class InvoiceRepository implements InvoiceInterface
                 'message' => __('messages.recent_invoices_fetched'),
                 'data' => $invoices
             ];
-
         } catch (\Exception $e) {
             Log::error('InvoiceRepository getRecentInvoices error: ' . $e->getMessage());
 
@@ -592,9 +642,9 @@ class InvoiceRepository implements InvoiceInterface
         try {
             $invoices = Invoice::with(['client'])
                 ->where('status', Constants::INVOICE_STATUS_OVERDUE)
-                ->orWhere(function($query) {
+                ->orWhere(function ($query) {
                     $query->where('status', Constants::INVOICE_STATUS_SENT)
-                          ->where('due_date', '<', now());
+                        ->where('due_date', '<', now());
                 })
                 ->orderBy('due_date', 'asc')
                 ->get();
@@ -604,7 +654,6 @@ class InvoiceRepository implements InvoiceInterface
                 'message' => __('messages.overdue_invoices_fetched'),
                 'data' => $invoices
             ];
-
         } catch (\Exception $e) {
             Log::error('InvoiceRepository getOverdueInvoices error: ' . $e->getMessage());
 

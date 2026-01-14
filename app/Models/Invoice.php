@@ -12,7 +12,7 @@ class Invoice extends Model
 
     protected $fillable = [
         'client_id',
-        'user_id', // تمت إضافته
+        'user_id',
         'invoice_number',
         'invoice_date',
         'due_date',
@@ -23,6 +23,7 @@ class Invoice extends Model
         'total',
         'currency',
         'notes',
+        'enable_stripe_checkout', // إضافة الحقل الجديد هنا
         'terms',
         'footer',
         'sent_at',
@@ -40,6 +41,7 @@ class Invoice extends Model
         'tax_amount' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'total' => 'decimal:2',
+        'enable_stripe_checkout' => 'boolean', // إضافة التصنيف
         'is_active' => 'boolean',
     ];
 
@@ -66,23 +68,23 @@ class Invoice extends Model
 
     public function scopeOverdue($query)
     {
-        return $query->where(function($q) {
+        return $query->where(function ($q) {
             $q->where('status', Constants::INVOICE_STATUS_OVERDUE)
-              ->orWhere(function($query) {
-                  $query->where('status', Constants::INVOICE_STATUS_SENT)
+                ->orWhere(function ($query) {
+                    $query->where('status', Constants::INVOICE_STATUS_SENT)
                         ->where('due_date', '<', now());
-              });
+                });
         });
     }
 
     public function scopeSearch($query, $search)
     {
-        return $query->where(function($q) use ($search) {
+        return $query->where(function ($q) use ($search) {
             $q->where('invoice_number', 'like', "%{$search}%")
-              ->orWhereHas('client', function($client) use ($search) {
-                  $client->where('name', 'like', "%{$search}%")
-                         ->orWhere('company_name', 'like', "%{$search}%");
-              });
+                ->orWhereHas('client', function ($client) use ($search) {
+                    $client->where('name', 'like', "%{$search}%")
+                        ->orWhere('company_name', 'like', "%{$search}%");
+                });
         });
     }
 
@@ -92,7 +94,7 @@ class Invoice extends Model
         return $this->belongsTo(Client::class);
     }
 
-    public function user() // تمت إضافته
+    public function user()
     {
         return $this->belongsTo(User::class);
     }
@@ -100,6 +102,16 @@ class Invoice extends Model
     public function items()
     {
         return $this->hasMany(InvoiceItem::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function latestPayment()
+    {
+        return $this->hasOne(Payment::class)->latestOfMany();
     }
 
     public function createdBy()
@@ -147,7 +159,7 @@ class Invoice extends Model
     public function isOverdue()
     {
         return $this->status === Constants::INVOICE_STATUS_OVERDUE ||
-               ($this->status === Constants::INVOICE_STATUS_SENT &&
+            ($this->status === Constants::INVOICE_STATUS_SENT &&
                 $this->due_date < now());
     }
 
@@ -164,5 +176,27 @@ class Invoice extends Model
         ]);
 
         return $total;
+    }
+
+    public function canBePaid()
+    {
+        return $this->status !== self::INVOICE_STATUS_PAID
+            && $this->total > 0;
+    }
+
+    /**
+     * الحصول على حالة Stripe Checkout
+     */
+    public function getStripeCheckoutStatusAttribute()
+    {
+        if (!$this->enable_stripe_checkout) {
+            return 'معطل';
+        }
+
+        if ($this->status === 'paid') {
+            return 'مدفوع';
+        }
+
+        return 'نشط';
     }
 }

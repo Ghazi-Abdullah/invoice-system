@@ -15,6 +15,10 @@ use App\Repository\Admin\Report\ReportInterface;
 use App\Repository\Admin\Report\ReportRepository;
 use App\Repository\Admin\Permission\PermissionInterface;
 use App\Repository\Admin\Permission\PermissionRepository;
+use App\Repository\Admin\Payment\PaymentInterface;
+use App\Repository\Admin\Payment\PaymentRepository;
+use Illuminate\Support\Facades\Validator;
+use App\Constants\Constants;
 use App\Services\InvoiceService;
 use App\Services\ReportService;
 
@@ -22,12 +26,12 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register()
     {
-        $this->app->singleton(InvoiceService::class, function ($app) {
+        /*$this->app->singleton(InvoiceService::class, function ($app) {
             return new InvoiceService();
-        });
+        });*/
 
         $this->app->singleton(ReportService::class, function ($app) {
-            return new ReportService();
+            return new ReportService($app->make(ReportInterface::class));
         });
 
         // Bind Repositories
@@ -37,24 +41,26 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(AdminGroupInterface::class, AdminGroupRepository::class);
         $this->app->bind(ReportInterface::class, ReportRepository::class);
         $this->app->bind(PermissionInterface::class, PermissionRepository::class);
+
+        $this->app->bind(PaymentInterface::class, PaymentRepository::class);
     }
 
     public function boot()
     {
         // Register validation rules
-        \Validator::extend('valid_currency', function ($attribute, $value, $parameters, $validator) {
+        Validator::extend('valid_currency', function ($attribute, $value, $parameters, $validator) {
             $validCurrencies = [
-                \App\Constants\Constants::CURRENCY_USD,
-                \App\Constants\Constants::CURRENCY_EUR,
-                \App\Constants\Constants::CURRENCY_GBP,
-                \App\Constants\Constants::CURRENCY_SAR,
-                \App\Constants\Constants::CURRENCY_AED
+                Constants::CURRENCY_USD,
+                Constants::CURRENCY_EUR,
+                Constants::CURRENCY_GBP,
+                Constants::CURRENCY_SAR,
+                Constants::CURRENCY_AED
             ];
 
             return in_array($value, $validCurrencies);
         });
 
-        \Validator::replacer('valid_currency', function ($message, $attribute, $rule, $parameters) {
+        Validator::replacer('valid_currency', function ($message, $attribute, $rule, $parameters) {
             return str_replace(':attribute', $attribute, 'The selected currency is not valid.');
         });
 
