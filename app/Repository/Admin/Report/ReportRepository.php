@@ -5,7 +5,6 @@ namespace App\Repository\Admin\Report;
 use App\Models\Invoice;
 use App\Models\Client;
 use App\Models\Payment;
-use App\Models\User;
 use App\Constants\Constants;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -45,7 +44,7 @@ class ReportRepository implements ReportInterface
         ];
 
         return [
-            'data' => $invoices->items(),
+            'items' => $invoices->items(),
             'stats' => $stats,
             'pagination' => [
                 'current_page' => $invoices->currentPage(),
@@ -64,13 +63,13 @@ class ReportRepository implements ReportInterface
     public function getClientReport(array $filters = []): array
     {
         $query = Client::withCount(['invoices' => function ($q) use ($filters) {
-                if (!empty($filters['start_date'])) {
-                    $q->whereDate('created_at', '>=', $filters['start_date']);
-                }
-                if (!empty($filters['end_date'])) {
-                    $q->whereDate('created_at', '<=', $filters['end_date']);
-                }
-            }])
+            if (!empty($filters['start_date'])) {
+                $q->whereDate('created_at', '>=', $filters['start_date']);
+            }
+            if (!empty($filters['end_date'])) {
+                $q->whereDate('created_at', '<=', $filters['end_date']);
+            }
+        }])
             ->withSum(['invoices' => function ($q) use ($filters) {
                 if (!empty($filters['start_date'])) {
                     $q->whereDate('created_at', '>=', $filters['start_date']);
@@ -95,7 +94,7 @@ class ReportRepository implements ReportInterface
         ];
 
         return [
-            'data' => $clients->map(function ($client) {
+            'items' => $clients->map(function ($client) {
                 return [
                     'id' => $client->id,
                     'name' => $client->name,
@@ -119,11 +118,11 @@ class ReportRepository implements ReportInterface
     public function getRevenueReport(array $filters = []): array
     {
         $query = Invoice::select(
-                DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
-                DB::raw('COUNT(*) as invoice_count'),
-                DB::raw('SUM(total) as total_amount'),
-                DB::raw('SUM(CASE WHEN status = "paid" THEN total ELSE 0 END) as paid_amount')
-            )
+            DB::raw('DATE_FORMAT(created_at, "%Y-%m") as month'),
+            DB::raw('COUNT(*) as invoice_count'),
+            DB::raw('SUM(total) as total_amount'),
+            DB::raw('SUM(CASE WHEN status = "' . Constants::INVOICE_STATUS_PAID . '" THEN total ELSE 0 END) as paid_amount')
+        )
             ->when(!empty($filters['start_date']), function ($q) use ($filters) {
                 $q->whereDate('created_at', '>=', $filters['start_date']);
             })
@@ -148,7 +147,7 @@ class ReportRepository implements ReportInterface
         ];
 
         return [
-            'data' => $revenueData->map(function ($item) {
+            'items' => $revenueData->map(function ($item) {
                 return [
                     'month' => $item->month,
                     'invoice_count' => $item->invoice_count,
@@ -169,10 +168,10 @@ class ReportRepository implements ReportInterface
         $query = Invoice::with(['client'])
             ->where(function ($q) {
                 $q->where('status', Constants::INVOICE_STATUS_OVERDUE)
-                  ->orWhere(function ($sub) {
-                      $sub->where('status', Constants::INVOICE_STATUS_SENT)
-                          ->whereDate('due_date', '<', now());
-                  });
+                    ->orWhere(function ($sub) {
+                        $sub->where('status', Constants::INVOICE_STATUS_SENT)
+                            ->whereDate('due_date', '<', now());
+                    });
             })
             ->when(!empty($filters['start_date']), function ($q) use ($filters) {
                 $q->whereDate('created_at', '>=', $filters['start_date']);
@@ -193,7 +192,7 @@ class ReportRepository implements ReportInterface
         ];
 
         return [
-            'data' => $overdueInvoices->map(function ($invoice) {
+            'items' => $overdueInvoices->map(function ($invoice) {
                 $daysOverdue = max(0, now()->diffInDays($invoice->due_date));
 
                 return [
@@ -238,10 +237,8 @@ class ReportRepository implements ReportInterface
      */
     public function exportReport(string $type, array $filters = []): array
     {
-        // هنا يمكنك إضافة كود التصدير إلى Excel
-        // هذا مثال بسيط
-
-        $report = match($type) {
+        // الحصول على البيانات
+        $report = match ($type) {
             'invoices' => $this->getInvoiceReport($filters),
             'clients' => $this->getClientReport($filters),
             'revenue' => $this->getRevenueReport($filters),
@@ -250,19 +247,22 @@ class ReportRepository implements ReportInterface
         };
 
         $fileName = "report_{$type}_" . date('Y_m_d_His') . '.json';
-        $filePath = storage_path('app/public/exports/' . $fileName);
+        $filePath = 'exports/' . $fileName;
+        $fullPath = storage_path('app/public/' . $filePath);
 
         // إنشاء المجلد إذا لم يكن موجوداً
-        if (!file_exists(dirname($filePath))) {
-            mkdir(dirname($filePath), 0777, true);
+        $directory = dirname($fullPath);
+        if (!file_exists($directory)) {
+            mkdir($directory, 0777, true);
         }
 
-        // حفظ البيانات في ملف (مؤقتاً)
-        file_put_contents($filePath, json_encode($report, JSON_PRETTY_PRINT));
+        // حفظ البيانات في ملف
+        file_put_contents($fullPath, json_encode($report, JSON_PRETTY_PRINT));
 
         return [
-            'file_path' => 'storage/exports/' . $fileName,
-            'file_name' => $fileName
+            'file_path' => $filePath,
+            'file_name' => $fileName,
+            'url' => asset('storage/' . $filePath)
         ];
     }
 
@@ -290,35 +290,47 @@ class ReportRepository implements ReportInterface
         DB::beginTransaction();
 
         try {
-            $invoice = Invoice::findOrFail($invoiceId);
+            $invoice = Invoice::with('client')->findOrFail($invoiceId);
 
             if ($invoice->status === Constants::INVOICE_STATUS_PAID) {
                 throw new \Exception('الفاتورة مدفوعة بالفعل');
             }
 
+            // تحديث حالة الفاتورة
             $invoice->update([
                 'status' => Constants::INVOICE_STATUS_PAID,
                 'paid_at' => now(),
-                'payment_date' => now()->format('Y-m-d')
             ]);
 
-            // إنشاء سجل الدفع
+            // إنشاء سجل الدفع مع جميع الحقول المطلوبة
             Payment::create([
                 'invoice_id' => $invoiceId,
+                'client_id' => $invoice->client_id,
+                'user_id' => auth()->id(), // أو null إذا لم يكن مسجلاً دخول
                 'amount' => $invoice->total,
-                'payment_date' => now(),
+                'currency' => $invoice->currency ?? 'SAR',
+                'status' => Constants::PAYMENT_STATUS_COMPLETED,
                 'payment_method' => 'manual',
-                'notes' => 'تم التسديد من خلال التقارير'
+                'payment_gateway' => 'manual',
+                'paid_at' => now(),
+                'metadata' => json_encode([
+                    'source' => 'report_system',
+                    'notes' => 'تم التسديد من خلال التقارير'
+                ])
             ]);
 
             DB::commit();
 
             return [
                 'message' => 'تم تسديد الفاتورة بنجاح',
-                'invoice' => $invoice->load('client')
+                'invoice' => $invoice->fresh(['client'])
             ];
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('فشل في تسديد الفاتورة: ' . $e->getMessage(), [
+                'invoice_id' => $invoiceId,
+                'error' => $e->getTraceAsString()
+            ]);
             throw $e;
         }
     }

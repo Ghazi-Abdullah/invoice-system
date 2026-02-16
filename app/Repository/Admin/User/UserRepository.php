@@ -3,10 +3,12 @@
 namespace App\Repository\Admin\User;
 
 use App\Models\User;
+use App\Models\Invoice;
 use App\Models\ActivityLog;
 use App\Constants\Constants;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 class UserRepository implements UserInterface
 {
@@ -228,13 +230,31 @@ class UserRepository implements UserInterface
             $userName = $user->name;
             $userId = $user->id;
 
-            // Check if user has created invoices
-            if ($user->invoices()->count() > 0) {
+            // التحقق من وجود فواتير مرتبطة بالمستخدم
+            // استخدم created_by بدلاً من user_id إذا لم يكن موجوداً
+            $hasInvoices = false;
+
+            // تحقق أولاً إذا كان عمود user_id موجود في جدول invoices
+            if (Schema::hasColumn('invoices', 'user_id')) {
+                // استخدم user_id إذا كان موجوداً
+                $hasInvoices = Invoice::where('user_id', $user->id)->exists();
+            } else {
+                // استخدم created_by إذا لم يكن user_id موجوداً
+                $hasInvoices = Invoice::where('created_by', $user->id)->exists();
+            }
+
+            if ($hasInvoices) {
                 return [
                     'status' => false,
                     'message' => __('messages.cannot_delete_user_with_invoices'),
                     'data' => null
                 ];
+            }
+
+            // تحقق من وجود أنشطة مرتبطة بالمستخدم
+            if ($user->activities()->count() > 0) {
+                // يمكنك حذف الأنشطة أولاً أو منع الحذف
+                $user->activities()->delete();
             }
 
             // Log activity before deletion

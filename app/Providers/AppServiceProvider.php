@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
@@ -17,23 +16,14 @@ use App\Repository\Admin\Permission\PermissionInterface;
 use App\Repository\Admin\Permission\PermissionRepository;
 use App\Repository\Admin\Payment\PaymentInterface;
 use App\Repository\Admin\Payment\PaymentRepository;
+use App\Services\ExportService;
 use Illuminate\Support\Facades\Validator;
 use App\Constants\Constants;
-use App\Services\InvoiceService;
-use App\Services\ReportService;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register()
     {
-        /*$this->app->singleton(InvoiceService::class, function ($app) {
-            return new InvoiceService();
-        });*/
-
-        $this->app->singleton(ReportService::class, function ($app) {
-            return new ReportService($app->make(ReportInterface::class));
-        });
-
         // Bind Repositories
         $this->app->bind(InvoiceInterface::class, InvoiceRepository::class);
         $this->app->bind(ClientInterface::class, ClientRepository::class);
@@ -41,8 +31,18 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(AdminGroupInterface::class, AdminGroupRepository::class);
         $this->app->bind(ReportInterface::class, ReportRepository::class);
         $this->app->bind(PermissionInterface::class, PermissionRepository::class);
-
         $this->app->bind(PaymentInterface::class, PaymentRepository::class);
+
+        // Bind Services
+        $this->app->singleton(ExportService::class, function ($app) {
+            return new ExportService();
+        });
+
+        // Bind Exports
+        $this->app->bind(\App\Exports\InvoiceReportExport::class);
+        $this->app->bind(\App\Exports\ClientReportExport::class);
+        $this->app->bind(\App\Exports\RevenueReportExport::class);
+        $this->app->bind(\App\Exports\OverdueReportExport::class);
     }
 
     public function boot()
@@ -61,10 +61,32 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Validator::replacer('valid_currency', function ($message, $attribute, $rule, $parameters) {
-            return str_replace(':attribute', $attribute, 'The selected currency is not valid.');
+            return str_replace(':attribute', $attribute, 'العملة المحددة غير صالحة.');
         });
 
         // Set global pagination limit
         \Illuminate\Pagination\Paginator::useBootstrap();
+
+        // تنظيف الملفات القديمة تلقائياً
+        $this->cleanupOldExports();
+    }
+
+    private function cleanupOldExports()
+    {
+        if (app()->runningInConsole()) {
+            return;
+        }
+
+        // تنظيف الملفات الأقدم من 7 أيام
+        try {
+            $exportService = app(ExportService::class);
+            $deleted = $exportService->cleanupOldFiles(7);
+
+            if ($deleted > 0) {
+                \Log::info("تم تنظيف {$deleted} ملف تصدير قديم تلقائياً.");
+            }
+        } catch (\Exception $e) {
+            \Log::error('فشل في تنظيف الملفات القديمة: ' . $e->getMessage());
+        }
     }
 }

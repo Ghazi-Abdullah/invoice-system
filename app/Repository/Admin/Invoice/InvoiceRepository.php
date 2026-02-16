@@ -208,7 +208,6 @@ class InvoiceRepository implements InvoiceInterface
             ];
         }
     }
-
     /**
      * إنشاء جلسة Stripe Checkout
      */
@@ -428,7 +427,7 @@ class InvoiceRepository implements InvoiceInterface
         }
     }
 
-   public function markAsPaid($request, $invoice)
+    public function markAsPaid($request, $invoice)
     {
         DB::beginTransaction();
 
@@ -490,7 +489,6 @@ class InvoiceRepository implements InvoiceInterface
                 'message' => __('messages.invoice_marked_paid'),
                 'data' => $invoice->load(['client', 'items'])
             ];
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('InvoiceRepository markAsPaid error: ' . $e->getMessage());

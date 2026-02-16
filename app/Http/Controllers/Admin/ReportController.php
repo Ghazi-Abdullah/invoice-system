@@ -7,6 +7,7 @@ use App\Repository\Admin\Report\ReportInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Http\Requests\Report\ReportFilterRequest;
+use Illuminate\Support\Facades\Storage;
 
 class ReportController extends Controller
 {
@@ -20,7 +21,7 @@ class ReportController extends Controller
     /**
      * تقرير الفواتير
      */
-    public function getInvoiceReport(ReportFilterRequest $request): JsonResponse
+    public function invoices(ReportFilterRequest $request): JsonResponse
     {
         try {
             $filters = $request->validated();
@@ -42,7 +43,7 @@ class ReportController extends Controller
     /**
      * تقرير العملاء
      */
-    public function getClientReport(ReportFilterRequest $request): JsonResponse
+    public function clients(ReportFilterRequest $request): JsonResponse
     {
         try {
             $filters = $request->validated();
@@ -64,7 +65,7 @@ class ReportController extends Controller
     /**
      * تقرير الإيرادات
      */
-    public function getRevenueReport(ReportFilterRequest $request): JsonResponse
+    public function revenue(ReportFilterRequest $request): JsonResponse
     {
         try {
             $filters = $request->validated();
@@ -86,7 +87,7 @@ class ReportController extends Controller
     /**
      * تقرير المتأخرات
      */
-    public function getOverdueReport(ReportFilterRequest $request): JsonResponse
+    public function overdue(ReportFilterRequest $request): JsonResponse
     {
         try {
             $filters = $request->validated();
@@ -106,30 +107,9 @@ class ReportController extends Controller
     }
 
     /**
-     * إحصائيات لوحة التحكم
-     */
-    public function getDashboardStats(): JsonResponse
-    {
-        try {
-            $stats = $this->reportRepository->getDashboardStats();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'تم تحميل الإحصائيات بنجاح',
-                'data' => $stats
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'فشل في تحميل الإحصائيات: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
      * تصدير التقرير
      */
-    public function exportReport(Request $request, string $type): JsonResponse
+    public function export(Request $request, string $type): JsonResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         try {
             $filters = $request->all();
@@ -142,6 +122,12 @@ class ReportController extends Controller
                 $filters['end_date'] = now()->format('Y-m-d');
             }
 
+            // إذا طلب تحميل مباشر
+            if ($request->has('download') && $request->input('download') === '1') {
+                return $this->downloadReport($type, $filters);
+            }
+
+            // حفظ في الخادم
             $export = $this->reportRepository->exportReport($type, $filters);
 
             return response()->json([
@@ -153,6 +139,100 @@ class ReportController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'فشل في تصدير التقرير: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * تحميل التقرير مباشرة
+     */
+    private function downloadReport(string $type, array $filters): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $export = $this->reportRepository->exportReport($type, $filters);
+        $filePath = storage_path('app/public/' . $export['file_path']);
+
+        return response()->download($filePath, $export['file_name']);
+    }
+
+    /**
+     * الحصول على الملفات المصدرة
+     */
+    public function exportedFiles(): JsonResponse
+    {
+        try {
+            $exportsPath = storage_path('app/public/exports');
+            $files = [];
+
+            if (file_exists($exportsPath)) {
+                $fileList = scandir($exportsPath);
+
+                foreach ($fileList as $file) {
+                    if ($file !== '.' && $file !== '..') {
+                        $filePath = $exportsPath . '/' . $file;
+                        $files[] = [
+                            'name' => $file,
+                            'size' => $this->formatSize(filesize($filePath)),
+                            'modified' => date('Y-m-d H:i:s', filemtime($filePath)),
+                            'url' => asset('storage/exports/' . $file)
+                        ];
+                    }
+                }
+            }
+
+            // ترتيب حسب تاريخ التعديل (الأحدث أولاً)
+            usort($files, function($a, $b) {
+                return strtotime($b['modified']) - strtotime($a['modified']);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم جلب الملفات المصدرة بنجاح',
+                'data' => $files
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل في جلب الملفات: ' . $e->getMessage(),
+                'data' => []
+            ], 500);
+        }
+    }
+
+    /**
+     * حذف ملف مصدر
+     */
+    public function deleteExportedFile(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'file_name' => 'required|string'
+            ]);
+
+            $fileName = $request->input('file_name');
+            $filePath = storage_path('app/public/exports/' . $fileName);
+
+            if (!file_exists($filePath)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'الملف غير موجود'
+                ], 404);
+            }
+
+            if (unlink($filePath)) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'تم حذف الملف بنجاح'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'فشل في حذف الملف'
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل في حذف الملف: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -196,6 +276,26 @@ class ReportController extends Controller
                 'success' => false,
                 'message' => 'فشل في تسديد الفاتورة: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * تنسيق حجم الملف
+     */
+    private function formatSize($bytes): string
+    {
+        if ($bytes >= 1073741824) {
+            return number_format($bytes / 1073741824, 2) . ' GB';
+        } elseif ($bytes >= 1048576) {
+            return number_format($bytes / 1048576, 2) . ' MB';
+        } elseif ($bytes >= 1024) {
+            return number_format($bytes / 1024, 2) . ' KB';
+        } elseif ($bytes > 1) {
+            return $bytes . ' bytes';
+        } elseif ($bytes == 1) {
+            return $bytes . ' byte';
+        } else {
+            return '0 bytes';
         }
     }
 }
