@@ -233,11 +233,12 @@ class ReportRepository implements ReportInterface
     }
 
     /**
-     * تصدير التقرير
+     * تصدير التقرير - هذه الدالة لم تعد مستخدمة بعد تعديل Controller
+     * يمكن إزالتها أو تركها للتوافق
      */
     public function exportReport(string $type, array $filters = []): array
     {
-        // الحصول على البيانات
+        // لم نعد بحاجة لهذه الدالة، يمكن تركها ترجع بيانات فقط
         $report = match ($type) {
             'invoices' => $this->getInvoiceReport($filters),
             'clients' => $this->getClientReport($filters),
@@ -246,24 +247,7 @@ class ReportRepository implements ReportInterface
             default => throw new \InvalidArgumentException("نوع التقرير غير صالح: {$type}")
         };
 
-        $fileName = "report_{$type}_" . date('Y_m_d_His') . '.json';
-        $filePath = 'exports/' . $fileName;
-        $fullPath = storage_path('app/public/' . $filePath);
-
-        // إنشاء المجلد إذا لم يكن موجوداً
-        $directory = dirname($fullPath);
-        if (!file_exists($directory)) {
-            mkdir($directory, 0777, true);
-        }
-
-        // حفظ البيانات في ملف
-        file_put_contents($fullPath, json_encode($report, JSON_PRETTY_PRINT));
-
-        return [
-            'file_path' => $filePath,
-            'file_name' => $fileName,
-            'url' => asset('storage/' . $filePath)
-        ];
+        return $report; // فقط نعيد البيانات
     }
 
     /**

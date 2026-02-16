@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -36,45 +37,39 @@ class ClientReportExport implements FromArray, WithHeadings, WithMapping, WithSt
     public function headings(): array
     {
         return [
-            'اسم العميل',
-            'البريد الإلكتروني',
-            'رقم الهاتف',
-            'اسم الشركة',
-            'عدد الفواتير',
-            'إجمالي المبلغ',
-            'المبلغ المدفوع',
-            'المبلغ المستحق',
-            'متوسط قيمة الفاتورة',
-            'تاريخ الإنشاء',
-            'آخر فاتورة',
-            'حالة العميل'
+            __('clients.name'),
+            __('clients.email'),
+            __('clients.phone'),
+            __('clients.company'),
+            __('reports.invoices_count'),
+            __('reports.total_amount'),
+            __('reports.average_invoice'),
+            __('reports.created_at'),
+            __('reports.client_status')
         ];
     }
 
     public function map($client): array
     {
-        $status = ($client['invoices_count'] ?? 0) > 0 ? 'نشط' : 'غير نشط';
+        $status = ($client['invoices_count'] ?? 0) > 0 ? __('reports.active') : __('reports.inactive');
 
         return [
-            $client['name'] ?? 'غير محدد',
-            $client['email'] ?? 'غير محدد',
-            $client['phone'] ?? 'غير محدد',
-            $client['company_name'] ?? 'غير محدد',
+            $client['name'] ?? __('reports.unknown'),
+            $client['email'] ?? __('reports.unknown'),
+            $client['phone'] ?? __('reports.unknown'),
+            $client['company_name'] ?? __('reports.unknown'),
             $client['invoices_count'] ?? 0,
-            $client['total_invoiced'] ?? 0,
-            $client['total_paid'] ?? 0,
-            $client['total_due'] ?? 0,
+            $client['total_spent'] ?? 0,
             $client['average_invoice'] ?? 0,
-            $client['created_at'] ?? 'غير محدد',
-            $client['last_invoice_date'] ?? 'لا يوجد',
+            $client['created_at'] ?? __('reports.unknown'),
             $status
         ];
     }
 
+    // باقي الدوال (styles, registerEvents, title) مع تحديث نطاقات الأعمدة (مثلاً أصبحت A1:I1 بدلاً من A1:L1)
     public function styles(Worksheet $sheet)
     {
-        // تنسيق العنوان
-        $sheet->getStyle('A1:L1')->applyFromArray([
+        $sheet->getStyle('A1:I1')->applyFromArray([
             'font' => [
                 'bold' => true,
                 'size' => 12,
@@ -96,19 +91,16 @@ class ClientReportExport implements FromArray, WithHeadings, WithMapping, WithSt
             ]
         ]);
 
-        // تنسيق جميع الخلايا
         $lastRow = $sheet->getHighestRow();
-        $sheet->getStyle('A2:L' . $lastRow)
+        $sheet->getStyle('A2:I' . $lastRow)
             ->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER);
 
-        // تنسيق الأرقام
-        $sheet->getStyle('F2:I' . $lastRow)
+        $sheet->getStyle('F2:G' . $lastRow) // تعديل حسب الأعمدة الرقمية
             ->getNumberFormat()
             ->setFormatCode(NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1);
 
-        // إضافة حدود
-        $sheet->getStyle('A1:L' . $lastRow)
+        $sheet->getStyle('A1:I' . $lastRow)
             ->getBorders()
             ->getAllBorders()
             ->setBorderStyle(Border::BORDER_THIN);
@@ -116,6 +108,7 @@ class ClientReportExport implements FromArray, WithHeadings, WithMapping, WithSt
         return [];
     }
 
+    // registerEvents: تأكد من تحديث الخلايا المستخدمة للإحصائيات (إذا كانت تعتمد على مواقع الأعمدة)
     public function registerEvents(): array
     {
         return [
@@ -123,39 +116,37 @@ class ClientReportExport implements FromArray, WithHeadings, WithMapping, WithSt
                 $sheet = $event->sheet;
                 $lastRow = $sheet->getHighestRow();
 
-                // إضافة صف الإجماليات
                 $summaryRow = $lastRow + 2;
 
-                $sheet->setCellValue('A' . $summaryRow, 'إحصائيات التقرير:');
+                $sheet->setCellValue('A' . $summaryRow, __('reports.statistics'));
                 $sheet->getStyle('A' . $summaryRow)->getFont()->setBold(true);
 
-                $sheet->setCellValue('A' . ($summaryRow + 1), 'إجمالي العملاء:');
+                $sheet->setCellValue('A' . ($summaryRow + 1), __('reports.total_clients') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 1), $this->stats['total_clients'] ?? 0);
 
-                $sheet->setCellValue('A' . ($summaryRow + 2), 'العملاء النشطين:');
+                $sheet->setCellValue('A' . ($summaryRow + 2), __('reports.active_clients') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 2), $this->stats['active_clients'] ?? 0);
 
-                $sheet->setCellValue('A' . ($summaryRow + 3), 'إجمالي الفواتير:');
+                $sheet->setCellValue('A' . ($summaryRow + 3), __('reports.total_invoices') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 3), $this->stats['total_invoices'] ?? 0);
 
-                $sheet->setCellValue('A' . ($summaryRow + 4), 'إجمالي الإيرادات:');
+                $sheet->setCellValue('A' . ($summaryRow + 4), __('reports.total_revenue') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 4), number_format($this->stats['total_revenue'] ?? 0, 2));
 
-                $sheet->setCellValue('A' . ($summaryRow + 5), 'نسبة التحصيل:');
+                $sheet->setCellValue('A' . ($summaryRow + 5), __('reports.collection_rate') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 5), ($this->stats['collection_rate'] ?? 0) . '%');
 
-                // إضافة معلومات التقرير
                 $infoRow = $summaryRow + 7;
-                $sheet->setCellValue('A' . $infoRow, 'معلومات التقرير:');
+                $sheet->setCellValue('A' . $infoRow, __('reports.report_info') . ':');
                 $sheet->getStyle('A' . $infoRow)->getFont()->setBold(true);
 
-                $sheet->setCellValue('A' . ($infoRow + 1), 'تاريخ الإنشاء: ' . date('Y-m-d H:i:s'));
+                $sheet->setCellValue('A' . ($infoRow + 1), __('reports.generated_at') . ': ' . date('Y-m-d H:i:s'));
             }
         ];
     }
 
     public function title(): string
     {
-        return 'تقرير العملاء';
+        return __('reports.client_report');
     }
 }

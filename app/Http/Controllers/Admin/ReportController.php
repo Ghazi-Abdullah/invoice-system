@@ -7,7 +7,11 @@ use App\Repository\Admin\Report\ReportInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Http\Requests\Report\ReportFilterRequest;
-use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\InvoiceReportExport;
+use App\Exports\ClientReportExport;
+use App\Exports\RevenueReportExport;
+use App\Exports\OverdueReportExport;
 
 class ReportController extends Controller
 {
@@ -122,18 +126,37 @@ class ReportController extends Controller
                 $filters['end_date'] = now()->format('Y-m-d');
             }
 
+            // جلب البيانات حسب نوع التقرير
+            $reportData = $this->getReportData($type, $filters);
+
+            if (empty($reportData['items'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'لا توجد بيانات للتصدير'
+                ], 404);
+            }
+
+            // اختيار كلاس التصدير المناسب
+            $exportClass = $this->getExportClass($type, $reportData);
+
             // إذا طلب تحميل مباشر
             if ($request->has('download') && $request->input('download') === '1') {
-                return $this->downloadReport($type, $filters);
+                return Excel::download($exportClass, $this->getFileName($type));
             }
 
             // حفظ في الخادم
-            $export = $this->reportRepository->exportReport($type, $filters);
+            $fileName = $this->getFileName($type, true);
+            $filePath = 'exports/' . $fileName;
+            Excel::store($exportClass, $filePath, 'public');
 
             return response()->json([
                 'success' => true,
                 'message' => 'تم إنشاء ملف التصدير بنجاح',
-                'data' => $export
+                'data' => [
+                    'file_path' => $filePath,
+                    'file_name' => $fileName,
+                    'url' => asset('storage/' . $filePath)
+                ]
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -141,6 +164,62 @@ class ReportController extends Controller
                 'message' => 'فشل في تصدير التقرير: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * جلب بيانات التقرير حسب النوع
+     */
+    private function getReportData(string $type, array $filters): array
+    {
+        switch ($type) {
+            case 'invoices':
+                return $this->reportRepository->getInvoiceReport($filters);
+            case 'clients':
+                return $this->reportRepository->getClientReport($filters);
+            case 'revenue':
+                return $this->reportRepository->getRevenueReport($filters);
+            case 'overdue':
+                return $this->reportRepository->getOverdueReport($filters);
+            default:
+                throw new \InvalidArgumentException("نوع التقرير غير صحيح: {$type}");
+        }
+    }
+
+    /**
+     * الحصول على كلاس التصدير المناسب
+     */
+    private function getExportClass(string $type, array $data)
+    {
+        switch ($type) {
+            case 'invoices':
+                return new InvoiceReportExport($data);
+            case 'clients':
+                return new ClientReportExport($data);
+            case 'revenue':
+                return new RevenueReportExport($data);
+            case 'overdue':
+                return new OverdueReportExport($data);
+            default:
+                throw new \InvalidArgumentException("نوع التقرير غير صحيح: {$type}");
+        }
+    }
+
+    /**
+     * توليد اسم الملف
+     */
+    private function getFileName(string $type, bool $withTimestamp = false): string
+    {
+        $names = [
+            'invoices' => 'تقرير_الفواتير',
+            'clients' => 'تقرير_العملاء',
+            'revenue' => 'تقرير_الإيرادات',
+            'overdue' => 'تقرير_المتأخرات'
+        ];
+
+        $baseName = $names[$type] ?? 'تقرير';
+        $timestamp = $withTimestamp ? '_' . date('Y_m_d_His') : '';
+
+        return $baseName . $timestamp . '.xlsx';
     }
 
     /**
@@ -180,7 +259,7 @@ class ReportController extends Controller
             }
 
             // ترتيب حسب تاريخ التعديل (الأحدث أولاً)
-            usort($files, function($a, $b) {
+            usort($files, function ($a, $b) {
                 return strtotime($b['modified']) - strtotime($a['modified']);
             });
 

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -42,19 +43,19 @@ class RevenueReportExport implements FromArray, WithHeadings, WithMapping, WithS
     public function headings(): array
     {
         return [
-            'الشهر',
-            'عدد الفواتير',
-            'إجمالي الإيرادات',
-            'الإيرادات المحصلة',
-            'الإيرادات المستحقة',
-            'نسبة التحصيل %'
+            __('reports.month'),
+            __('reports.invoices_count'),
+            __('reports.total_revenue'),
+            __('reports.collected_revenue'),
+            __('reports.outstanding_revenue'),
+            __('reports.collection_rate')
         ];
     }
 
     public function map($item): array
     {
         return [
-            $item['month'] ?? 'غير محدد',
+            $item['month'] ?? __('reports.unknown'),
             $item['invoice_count'] ?? 0,
             $item['total_amount'] ?? 0,
             $item['paid_amount'] ?? 0,
