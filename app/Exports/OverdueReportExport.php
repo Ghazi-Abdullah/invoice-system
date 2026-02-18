@@ -15,6 +15,8 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class OverdueReportExport implements FromArray, WithHeadings, WithMapping, WithStyles, WithEvents, WithTitle, ShouldAutoSize
 {
@@ -27,11 +29,38 @@ class OverdueReportExport implements FromArray, WithHeadings, WithMapping, WithS
         $this->data = $data;
         $this->filters = $filters;
         $this->stats = $data['stats'] ?? [];
+
+        // تسجيل البيانات للتشخيص
+        Log::info('OverdueReportExport constructed', [
+            'items_count' => isset($data['items']) ? (is_countable($data['items']) ? count($data['items']) : 'غير قابل للعد') : 0,
+            'stats' => $this->stats,
+        ]);
     }
 
     public function array(): array
     {
-        return $this->data['items'] ?? [];
+        $items = $this->data['items'] ?? [];
+
+        // إذا كانت المجموعة من نوع Collection، قم بتحويلها إلى مصفوفة
+        if ($items instanceof Collection) {
+            $items = $items->toArray();
+        }
+
+        // إذا كانت مصفوفة من الكائنات (Eloquent models)، قم بتحويلها إلى مصفوفات
+        if (is_array($items) && !empty($items) && is_object($items[0])) {
+            $items = json_decode(json_encode($items), true);
+        }
+
+        // تسجيل للتشخيص
+        if (empty($items)) {
+            Log::warning('OverdueReportExport: No items to export', ['data_keys' => array_keys($this->data)]);
+        } else {
+            Log::info('OverdueReportExport: Items count', ['count' => count($items)]);
+            // تسجيل أول عنصر لمعرفة هيكله (تجنب تسجيل البيانات الكبيرة)
+            Log::debug('OverdueReportExport: First item sample', ['sample' => $items[0] ?? null]);
+        }
+
+        return $items;
     }
 
     public function headings(): array
@@ -51,6 +80,11 @@ class OverdueReportExport implements FromArray, WithHeadings, WithMapping, WithS
 
     public function map($invoice): array
     {
+        // معالجة آمنة: تحويل الكائن إلى مصفوفة إذا لزم الأمر
+        if (is_object($invoice)) {
+            $invoice = (array) $invoice;
+        }
+
         $statusMap = [
             'paid' => __('invoices.status.paid'),
             'unpaid' => __('invoices.status.unpaid'),
@@ -60,16 +94,26 @@ class OverdueReportExport implements FromArray, WithHeadings, WithMapping, WithS
             'overdue' => __('invoices.status.overdue'),
         ];
 
-        $status = $statusMap[$invoice['status']] ?? $invoice['status'];
-        $paidAmount = $invoice['paid_amount'] ?? 0;
-        $total = $invoice['total_amount'] ?? 0;
+        $status = $statusMap[$invoice['status'] ?? ''] ?? ($invoice['status'] ?? __('reports.unknown'));
+        $paidAmount = (float) ($invoice['paid_amount'] ?? 0);
+        $total = (float) ($invoice['total_amount'] ?? $invoice['total'] ?? 0);
+
+        // التعامل مع client (قد يكون مصفوفة أو كائن)
+        $clientName = __('reports.unknown');
+        if (isset($invoice['client'])) {
+            if (is_array($invoice['client'])) {
+                $clientName = $invoice['client']['name'] ?? __('reports.unknown');
+            } elseif (is_object($invoice['client'])) {
+                $clientName = $invoice['client']->name ?? __('reports.unknown');
+            }
+        }
 
         return [
             $invoice['invoice_number'] ?? __('reports.unknown'),
-            $invoice['client']['name'] ?? __('reports.unknown'),
+            $clientName,
             $invoice['issue_date'] ?? $invoice['invoice_date'] ?? __('reports.unknown'),
             $invoice['due_date'] ?? __('reports.unknown'),
-            $invoice['days_overdue'] ?? 0,
+            (int) ($invoice['days_overdue'] ?? 0),
             $total,
             $paidAmount,
             $total - $paidAmount,
@@ -103,13 +147,15 @@ class OverdueReportExport implements FromArray, WithHeadings, WithMapping, WithS
         ]);
 
         $lastRow = $sheet->getHighestRow();
-        $sheet->getStyle('A2:I' . $lastRow)
-            ->getAlignment()
-            ->setVertical(Alignment::VERTICAL_CENTER);
+        if ($lastRow >= 2) {
+            $sheet->getStyle('A2:I' . $lastRow)
+                ->getAlignment()
+                ->setVertical(Alignment::VERTICAL_CENTER);
 
-        $sheet->getStyle('F2:H' . $lastRow)
-            ->getNumberFormat()
-            ->setFormatCode(NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1);
+            $sheet->getStyle('F2:H' . $lastRow)
+                ->getNumberFormat()
+                ->setFormatCode(NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1);
+        }
 
         $sheet->getStyle('A1:I' . $lastRow)
             ->getBorders()
@@ -128,29 +174,29 @@ class OverdueReportExport implements FromArray, WithHeadings, WithMapping, WithS
 
                 $summaryRow = $lastRow + 2;
 
-                $sheet->setCellValue('A' . $summaryRow, 'إحصائيات التقرير:');
+                $sheet->setCellValue('A' . $summaryRow, __('reports.statistics') . ':');
                 $sheet->getStyle('A' . $summaryRow)->getFont()->setBold(true);
 
-                $sheet->setCellValue('A' . ($summaryRow + 1), 'إجمالي الفواتير المتأخرة:');
+                $sheet->setCellValue('A' . ($summaryRow + 1), __('reports.total_overdue') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 1), $this->stats['total_overdue'] ?? 0);
 
-                $sheet->setCellValue('A' . ($summaryRow + 2), 'إجمالي المبلغ:');
+                $sheet->setCellValue('A' . ($summaryRow + 2), __('reports.total_amount') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 2), number_format($this->stats['total_amount'] ?? 0, 2));
 
-                $sheet->setCellValue('A' . ($summaryRow + 3), 'متوسط أيام التأخير:');
-                $sheet->setCellValue('B' . ($summaryRow + 3), ($this->stats['average_days_overdue'] ?? 0) . ' يوم');
+                $sheet->setCellValue('A' . ($summaryRow + 3), __('reports.average_days_overdue') . ':');
+                $sheet->setCellValue('B' . ($summaryRow + 3), ($this->stats['average_days_overdue'] ?? 0) . ' ' . __('reports.days'));
 
                 $infoRow = $summaryRow + 5;
-                $sheet->setCellValue('A' . $infoRow, 'معلومات التقرير:');
+                $sheet->setCellValue('A' . $infoRow, __('reports.report_info') . ':');
                 $sheet->getStyle('A' . $infoRow)->getFont()->setBold(true);
 
-                $sheet->setCellValue('A' . ($infoRow + 1), 'تاريخ الإنشاء: ' . date('Y-m-d H:i:s'));
+                $sheet->setCellValue('A' . ($infoRow + 1), __('reports.generated_at') . ': ' . date('Y-m-d H:i:s'));
 
                 if (!empty($this->filters['start_date'])) {
-                    $sheet->setCellValue('A' . ($infoRow + 2), 'تاريخ البدء: ' . $this->filters['start_date']);
+                    $sheet->setCellValue('A' . ($infoRow + 2), __('reports.start_date') . ': ' . $this->filters['start_date']);
                 }
                 if (!empty($this->filters['end_date'])) {
-                    $sheet->setCellValue('A' . ($infoRow + 3), 'تاريخ النهاية: ' . $this->filters['end_date']);
+                    $sheet->setCellValue('A' . ($infoRow + 3), __('reports.end_date') . ': ' . $this->filters['end_date']);
                 }
             }
         ];
@@ -158,6 +204,6 @@ class OverdueReportExport implements FromArray, WithHeadings, WithMapping, WithS
 
     public function title(): string
     {
-        return 'تقرير المتأخرات';
+        return __('reports.overdue_report');
     }
 }

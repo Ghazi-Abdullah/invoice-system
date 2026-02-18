@@ -66,5 +66,24 @@ return [
         'report_info' => 'معلومات التقرير',
         'generated_at' => 'تاريخ الإنشاء',
         'client_report' => 'تقرير العملاء',
+        'no_data' => 'لا توجد بيانات للتصدير',
+        'revenue_report' => 'تقرير الإيرادات',
+        'overdue_report' => 'تقرير المتأخرات',
+        'invoice_report' => 'تقرير الفواتير',
+        'total_amount' => 'إجمالي المبلغ',
+        'paid_amount' => 'المبلغ المدفوع',
+        'due_amount' => 'المبلغ المستحق',
+        'average_invoice' => 'متوسط قيمة الفاتورة',
+        'average_monthly_revenue' => 'متوسط الإيرادات الشهري',
+        'average_overdue_days' => 'متوسط ايام التأخير',
+        'total_overdue' => 'إجمالي المتاءخرات',
+        'total_amount_overdue' => 'إجمالي المبلغ المتأخر',
+        'paid_amount_overdue' => 'المبلغ المدفوع المتاءخر',
+        'due_amount_overdue' => 'المبلغ المستحق المتاءخر',
+        'collection_rate_overdue' => 'نسبة التحصيل المتاءخرة',
+        'average_monthly_revenue_overdue' => 'متوسط الإيرادات الشهري المتاءخرة',
+        
+
+
     ],
 ];

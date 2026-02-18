@@ -57,9 +57,6 @@ class ReportRepository implements ReportInterface
         ];
     }
 
-    /**
-     * تقرير العملاء
-     */
     public function getClientReport(array $filters = []): array
     {
         $query = Client::withCount(['invoices' => function ($q) use ($filters) {
@@ -86,11 +83,17 @@ class ReportRepository implements ReportInterface
 
         $clients = $query->get();
 
+        // حساب الإحصائيات
+        $totalClients = $clients->count();
+        $activeClients = $clients->where('invoices_count', '>', 0)->count();
+        $totalInvoices = $clients->sum('invoices_count');
+        $totalRevenue = $clients->sum('invoices_sum_total');
+
         $stats = [
-            'total_clients' => $clients->count(),
-            'active_clients' => $clients->where('invoices_count', '>', 0)->count(),
-            'total_invoices' => $clients->sum('invoices_count'),
-            'total_revenue' => $clients->sum('invoices_sum_total')
+            'total_clients' => $totalClients,
+            'active_clients' => $activeClients,
+            'total_invoices' => $totalInvoices,
+            'total_revenue' => $totalRevenue,
         ];
 
         return [
@@ -102,12 +105,13 @@ class ReportRepository implements ReportInterface
                     'phone' => $client->phone,
                     'company_name' => $client->company_name,
                     'invoices_count' => $client->invoices_count,
-                    'total_spent' => $client->invoices_sum_total,
+                    'total_spent' => $client->invoices_sum_total ?? 0,
                     'average_invoice' => $client->invoices_count > 0
-                        ? round($client->invoices_sum_total / $client->invoices_count, 2)
-                        : 0
+                        ? round(($client->invoices_sum_total ?? 0) / $client->invoices_count, 2)
+                        : 0,
+                    'created_at' => $client->created_at ? $client->created_at->format('Y-m-d') : null,
                 ];
-            }),
+            })->toArray(),
             'stats' => $stats
         ];
     }

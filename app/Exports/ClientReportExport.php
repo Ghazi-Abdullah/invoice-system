@@ -66,9 +66,9 @@ class ClientReportExport implements FromArray, WithHeadings, WithMapping, WithSt
         ];
     }
 
-    // باقي الدوال (styles, registerEvents, title) مع تحديث نطاقات الأعمدة (مثلاً أصبحت A1:I1 بدلاً من A1:L1)
     public function styles(Worksheet $sheet)
     {
+        // تنسيق العنوان (9 أعمدة A-I)
         $sheet->getStyle('A1:I1')->applyFromArray([
             'font' => [
                 'bold' => true,
@@ -96,7 +96,8 @@ class ClientReportExport implements FromArray, WithHeadings, WithMapping, WithSt
             ->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER);
 
-        $sheet->getStyle('F2:G' . $lastRow) // تعديل حسب الأعمدة الرقمية
+        // تنسيق الأعمدة الرقمية (F و G)
+        $sheet->getStyle('F2:G' . $lastRow)
             ->getNumberFormat()
             ->setFormatCode(NumberFormat::FORMAT_NUMBER_COMMA_SEPARATED1);
 
@@ -108,7 +109,6 @@ class ClientReportExport implements FromArray, WithHeadings, WithMapping, WithSt
         return [];
     }
 
-    // registerEvents: تأكد من تحديث الخلايا المستخدمة للإحصائيات (إذا كانت تعتمد على مواقع الأعمدة)
     public function registerEvents(): array
     {
         return [
@@ -116,6 +116,7 @@ class ClientReportExport implements FromArray, WithHeadings, WithMapping, WithSt
                 $sheet = $event->sheet;
                 $lastRow = $sheet->getHighestRow();
 
+                // إضافة صف الإحصائيات
                 $summaryRow = $lastRow + 2;
 
                 $sheet->setCellValue('A' . $summaryRow, __('reports.statistics'));
@@ -133,10 +134,9 @@ class ClientReportExport implements FromArray, WithHeadings, WithMapping, WithSt
                 $sheet->setCellValue('A' . ($summaryRow + 4), __('reports.total_revenue') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 4), number_format($this->stats['total_revenue'] ?? 0, 2));
 
-                $sheet->setCellValue('A' . ($summaryRow + 5), __('reports.collection_rate') . ':');
-                $sheet->setCellValue('B' . ($summaryRow + 5), ($this->stats['collection_rate'] ?? 0) . '%');
+                // ملاحظة: تم إزالة collection_rate لأنه غير موجود في إحصائيات العملاء
 
-                $infoRow = $summaryRow + 7;
+                $infoRow = $summaryRow + 6; // تعديل الرقم بعد إزالة صف collection_rate
                 $sheet->setCellValue('A' . $infoRow, __('reports.report_info') . ':');
                 $sheet->getStyle('A' . $infoRow)->getFont()->setBold(true);
 

@@ -15,12 +15,7 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
-use PhpOffice\PhpSpreadsheet\Chart\Chart;
-use PhpOffice\PhpSpreadsheet\Chart\DataSeries;
-use PhpOffice\PhpSpreadsheet\Chart\DataSeriesValues;
-use PhpOffice\PhpSpreadsheet\Chart\Legend;
-use PhpOffice\PhpSpreadsheet\Chart\PlotArea;
-use PhpOffice\PhpSpreadsheet\Chart\Title as ChartTitle;
+
 
 class RevenueReportExport implements FromArray, WithHeadings, WithMapping, WithStyles, WithEvents, WithTitle, ShouldAutoSize
 {
@@ -37,7 +32,11 @@ class RevenueReportExport implements FromArray, WithHeadings, WithMapping, WithS
 
     public function array(): array
     {
-        return $this->data['items'] ?? [];
+        $items = $this->data['items'] ?? [];
+        if ($items instanceof \Illuminate\Support\Collection) {
+            return $items->toArray();
+        }
+        return $items;
     }
 
     public function headings(): array
@@ -123,96 +122,44 @@ class RevenueReportExport implements FromArray, WithHeadings, WithMapping, WithS
                 // إضافة صف الإجماليات
                 $summaryRow = $lastRow + 2;
 
-                $sheet->setCellValue('A' . $summaryRow, 'إحصائيات التقرير:');
+                $sheet->setCellValue('A' . $summaryRow, __('reports.statistics'));
                 $sheet->getStyle('A' . $summaryRow)->getFont()->setBold(true);
 
-                $sheet->setCellValue('A' . ($summaryRow + 1), 'إجمالي الإيرادات:');
+                $sheet->setCellValue('A' . ($summaryRow + 1), __('reports.total_revenue') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 1), number_format($this->stats['total_revenue'] ?? 0, 2));
 
-                $sheet->setCellValue('A' . ($summaryRow + 2), 'الإيرادات المحصلة:');
+                $sheet->setCellValue('A' . ($summaryRow + 2), __('reports.collected_revenue') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 2), number_format($this->stats['collected_revenue'] ?? 0, 2));
 
-                $sheet->setCellValue('A' . ($summaryRow + 3), 'الإيرادات المستحقة:');
+                $sheet->setCellValue('A' . ($summaryRow + 3), __('reports.outstanding_revenue') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 3), number_format($this->stats['outstanding_revenue'] ?? 0, 2));
 
-                $sheet->setCellValue('A' . ($summaryRow + 4), 'نسبة التحصيل:');
+                $sheet->setCellValue('A' . ($summaryRow + 4), __('reports.collection_rate') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 4), ($this->stats['collection_rate'] ?? 0) . '%');
 
-                $sheet->setCellValue('A' . ($summaryRow + 5), 'متوسط الإيرادات الشهري:');
+                $sheet->setCellValue('A' . ($summaryRow + 5), __('reports.average_monthly_revenue') . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 5), number_format($this->stats['average_monthly_revenue'] ?? 0, 2));
 
-                // إنشاء مخطط بياني إذا كان هناك بيانات
-                if ($lastRow > 2) {
-                    $this->createRevenueChart($sheet, $lastRow, $summaryRow);
-                }
-
                 // إضافة معلومات التقرير
-                $infoRow = $summaryRow + 20; // بعد المخطط
-                $sheet->setCellValue('A' . $infoRow, 'معلومات التقرير:');
+                $infoRow = $summaryRow + 7; // تعديل المسافة لتكون مناسبة بعد إزالة المخطط
+                $sheet->setCellValue('A' . $infoRow, __('reports.report_info'));
                 $sheet->getStyle('A' . $infoRow)->getFont()->setBold(true);
 
-                $sheet->setCellValue('A' . ($infoRow + 1), 'تاريخ الإنشاء: ' . date('Y-m-d H:i:s'));
+                $sheet->setCellValue('A' . ($infoRow + 1), __('reports.generated_at') . ': ' . date('Y-m-d H:i:s'));
 
                 if (!empty($this->filters['start_date'])) {
-                    $sheet->setCellValue('A' . ($infoRow + 2), 'تاريخ البدء: ' . $this->filters['start_date']);
+                    $sheet->setCellValue('A' . ($infoRow + 2), __('reports.start_date') . ': ' . $this->filters['start_date']);
                 }
 
                 if (!empty($this->filters['end_date'])) {
-                    $sheet->setCellValue('A' . ($infoRow + 3), 'تاريخ النهاية: ' . $this->filters['end_date']);
+                    $sheet->setCellValue('A' . ($infoRow + 3), __('reports.end_date') . ': ' . $this->filters['end_date']);
                 }
             }
         ];
     }
 
-    private function createRevenueChart($sheet, $lastRow, $summaryRow)
-    {
-        // إعداد بيانات المخطط
-        $dataSeriesLabels = [
-            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, 'Worksheet!$C$1', null, 1),
-            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, 'Worksheet!$D$1', null, 1),
-        ];
-
-        $xAxisTickValues = [
-            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, 'Worksheet!$A$2:$A$' . $lastRow, null, $lastRow - 1),
-        ];
-
-        $dataSeriesValues = [
-            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, 'Worksheet!$C$2:$C$' . $lastRow, null, $lastRow - 1),
-            new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, 'Worksheet!$D$2:$D$' . $lastRow, null, $lastRow - 1),
-        ];
-
-        $series = new DataSeries(
-            DataSeries::TYPE_BARCHART,
-            DataSeries::GROUPING_STACKED,
-            range(0, count($dataSeriesValues) - 1),
-            $dataSeriesLabels,
-            $xAxisTickValues,
-            $dataSeriesValues
-        );
-
-        $plotArea = new PlotArea(null, [$series]);
-        $legend = new Legend(Legend::POSITION_RIGHT, null, false);
-
-        $title = new ChartTitle('توزيع الإيرادات الشهري');
-        $chart = new Chart(
-            'revenue_chart',
-            $title,
-            $legend,
-            $plotArea,
-            true,
-            0,
-            null,
-            null
-        );
-
-        $chart->setTopLeftPosition('H' . ($summaryRow + 2));
-        $chart->setBottomRightPosition('P' . ($summaryRow + 20));
-
-        $sheet->addChart($chart);
-    }
-
     public function title(): string
     {
-        return 'تقرير الإيرادات';
+        return __('reports.revenue_report');
     }
 }

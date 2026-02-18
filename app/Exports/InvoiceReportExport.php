@@ -130,33 +130,33 @@ class InvoiceReportExport implements FromArray, WithHeadings, WithMapping, WithS
                 // إضافة صف الإجماليات
                 $summaryRow = $lastRow + 2;
 
-                $sheet->setCellValue('A' . $summaryRow, 'إحصائيات التقرير:');
+                $sheet->setCellValue('A' . $summaryRow, __('reports.statistics') . ':');
                 $sheet->getStyle('A' . $summaryRow)->getFont()->setBold(true);
 
-                $sheet->setCellValue('A' . ($summaryRow + 1), 'إجمالي الفواتير:');
+                $sheet->setCellValue('A' . ($summaryRow + 1), 'reports.total_invoices' . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 1), $this->stats['total_invoices'] ?? 0);
 
-                $sheet->setCellValue('A' . ($summaryRow + 2), 'إجمالي المبلغ:');
+                $sheet->setCellValue('A' . ($summaryRow + 2), 'reports.total_amount' . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 2), number_format($this->stats['total_amount'] ?? 0, 2));
 
-                $sheet->setCellValue('A' . ($summaryRow + 3), 'المبلغ المدفوع:');
+                $sheet->setCellValue('A' . ($summaryRow + 3), 'reports.total_paid' . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 3), number_format($this->stats['total_paid'] ?? 0, 2));
 
-                $sheet->setCellValue('A' . ($summaryRow + 4), 'المبلغ المستحق:');
+                $sheet->setCellValue('A' . ($summaryRow + 4), 'reports.total_due' . ':');
                 $sheet->setCellValue('B' . ($summaryRow + 4), number_format($this->stats['total_due'] ?? 0, 2));
 
                 // إضافة معلومات التقرير
                 $infoRow = $summaryRow + 6;
-                $sheet->setCellValue('A' . $infoRow, 'معلومات التقرير:');
+                $sheet->setCellValue('A' . $infoRow, 'reports.report_info' . ':');
                 $sheet->getStyle('A' . $infoRow)->getFont()->setBold(true);
 
-                $sheet->setCellValue('A' . ($infoRow + 1), 'تاريخ الإنشاء: ' . date('Y-m-d H:i:s'));
+                $sheet->setCellValue('A' . ($infoRow + 1), 'reports.generated_at' . ': ' . date('Y-m-d H:i:s'));
 
                 if (!empty($this->filters['start_date'])) {
-                    $sheet->setCellValue('A' . ($infoRow + 2), 'تاريخ البدء: ' . $this->filters['start_date']);
+                    $sheet->setCellValue('A' . ($infoRow + 2), 'reports.start_date' . ': ' . $this->filters['start_date']);
                 }
                 if (!empty($this->filters['end_date'])) {
-                    $sheet->setCellValue('A' . ($infoRow + 3), 'تاريخ النهاية: ' . $this->filters['end_date']);
+                    $sheet->setCellValue('A' . ($infoRow + 3), ' reports.end_date' . ': ' . $this->filters['end_date']);
                 }
             }
         ];
@@ -164,6 +164,6 @@ class InvoiceReportExport implements FromArray, WithHeadings, WithMapping, WithS
 
     public function title(): string
     {
-        return 'تقرير الفواتير';
+        return 'reports.invoice_report';
     }
 }

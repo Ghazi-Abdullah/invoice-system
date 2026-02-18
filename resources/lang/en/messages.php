@@ -74,6 +74,8 @@ return [
     'cannot_delete_system_group' => 'System groups cannot be deleted',
     'cannot_update_system_group' => 'System groups cannot be updated',
     'cannot_delete_group_with_users' => 'Cannot delete group with assigned users',
+    'export_success' => 'Export file created successfully',
+    'export_failed' => 'Failed to export report',
 
     // Permission Messages
     'permission_fetched' => 'Permission retrieved successfully',

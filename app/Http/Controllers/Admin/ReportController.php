@@ -12,6 +12,7 @@ use App\Exports\InvoiceReportExport;
 use App\Exports\ClientReportExport;
 use App\Exports\RevenueReportExport;
 use App\Exports\OverdueReportExport;
+use Illuminate\Support\Facades\Log;
 
 class ReportController extends Controller
 {
@@ -116,7 +117,14 @@ class ReportController extends Controller
     public function export(Request $request, string $type): JsonResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         try {
+            // ضبط اللغة إذا تم إرسالها
+            if ($request->has('lang')) {
+                app()->setLocale($request->input('lang'));
+            }
+
             $filters = $request->all();
+            // إزالة lang من الفلاتر حتى لا يؤثر على الاستعلام
+            unset($filters['lang']);
 
             // إضافة تواريخ افتراضية إذا لم تكن موجودة
             if (empty($filters['start_date'])) {
@@ -132,14 +140,13 @@ class ReportController extends Controller
             if (empty($reportData['items'])) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'لا توجد بيانات للتصدير'
+                    'message' => __('reports.no_data')
                 ], 404);
             }
 
             // اختيار كلاس التصدير المناسب
             $exportClass = $this->getExportClass($type, $reportData);
 
-            // إذا طلب تحميل مباشر
             if ($request->has('download') && $request->input('download') === '1') {
                 return Excel::download($exportClass, $this->getFileName($type));
             }
@@ -151,7 +158,7 @@ class ReportController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'تم إنشاء ملف التصدير بنجاح',
+                'message' => __('messages.export_success'),
                 'data' => [
                     'file_path' => $filePath,
                     'file_name' => $fileName,
@@ -159,9 +166,15 @@ class ReportController extends Controller
                 ]
             ]);
         } catch (\Exception $e) {
+            Log::error('Export failed', [
+                'type' => $type,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في تصدير التقرير: ' . $e->getMessage()
+                'message' => __('messages.export_failed') . ': ' . $e->getMessage()
             ], 500);
         }
     }

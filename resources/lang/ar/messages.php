@@ -74,6 +74,8 @@ return [
     'cannot_delete_system_group' => 'لا يمكن حذف المجموعات النظامية',
     'cannot_update_system_group' => 'لا يمكن تحديث المجموعات النظامية',
     'cannot_delete_group_with_users' => 'لا يمكن حذف مجموعة بها مستخدمين معينين',
+    'export_success' => 'تم إنشاء ملف التصدير بنجاح',
+    'export_failed' => 'فشل في تصدير التقرير',
 
     // Permission Messages
     'permission_fetched' => 'تم استرجاع الصلاحية بنجاح',
