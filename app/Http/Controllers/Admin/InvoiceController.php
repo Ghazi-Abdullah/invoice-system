@@ -87,7 +87,7 @@ class InvoiceController extends Controller
         $data = $this->invoice->store($request);
 
         if ($data['status']) {
-            return $this->successResponse(
+            return $this->successResponse( 
                 __('messages.invoice_created'),
                 $data['data'],
                 Constants::RESPONSE_CREATED

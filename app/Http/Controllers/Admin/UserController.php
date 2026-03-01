@@ -195,11 +195,24 @@ class UserController extends Controller
 
     public function profile()
     {
-        $user = auth()->user();
+        $user = auth()->user()->load('adminGroup');
+
+        // جلب الصلاحيات من المجموعة أو المستخدم
+        $permissions = [];
+        $is_admin = false;
+
+        if ($user->adminGroup) {
+            $permissions = $user->adminGroup->permissions->pluck('title')->toArray();
+            $is_admin = in_array($user->admin_group_id, [Constants::SUPER_ADMIN_GROUP_ID, Constants::ADMIN_GROUP_ID]);
+        }
 
         return $this->successResponse(
             __('messages.profile_fetched'),
-            $user->load('adminGroup')
+            [
+                'user' => $user,
+                'permissions' => $permissions,
+                'is_admin' => $is_admin
+            ]
         );
     }
 
