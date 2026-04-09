@@ -1,2 +1,2 @@
-[build]
+[php.build]
 cmd = "composer install --optimize-autoloader --no-dev --no-interaction --ignore-platform-req=ext-gd"
