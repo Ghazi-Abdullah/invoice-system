@@ -16,6 +16,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'img',
         'password',
         'phone',
         'address',
@@ -24,18 +25,33 @@ class User extends Authenticatable
         'is_active',
         'admin_group_id',
         'email_verified_at',
-        'remember_token'
+        'remember_token',
+        'otp',
+        'otp_via',
+        'otp_created_at',
+        'otp_attempts',
+        'otp_verified_at',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'otp',
     ];
 
     protected $casts = [
         'email_verified_at' => 'datetime',
         'is_active' => 'boolean',
+        'otp_created_at'  => 'datetime',
+        'otp_verified_at' => 'datetime',
     ];
+
+    protected $appends = ['img_url'];
+
+    public function getImgUrlAttribute()
+    {
+        return $this->img ? asset('storage/' . $this->img) : null;
+    }
 
     // Scopes
     public function scopeActive($query)

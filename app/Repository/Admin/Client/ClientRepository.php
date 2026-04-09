@@ -3,7 +3,6 @@
 namespace App\Repository\Admin\Client;
 
 use App\Models\Client;
-use App\Models\Invoice;
 use App\Models\ActivityLog;
 use App\Constants\Constants;
 use Illuminate\Support\Facades\DB;
@@ -14,55 +13,54 @@ class ClientRepository implements ClientInterface
     public function index($request)
     {
         try {
-            $query = Client::with(['user', 'invoices'])
+            // ✅ بدل with(['user','invoices']) ثم loop بـ 4 queries لكل عميل
+            // نستخدم withCount + withSum في query واحد
+            $query = Client::withCount('invoices')
+                ->withSum('invoices', 'total')
+                ->withSum(['invoices as paid_amount' => function ($q) {
+                    $q->where('status', Constants::INVOICE_STATUS_PAID);
+                }], 'total')
+                ->with('creator:id,name')        // ✅ select فقط ما نحتاجه
                 ->orderBy('created_at', 'desc');
 
-            // Apply filters
             if ($request->has('is_active') && $request->is_active !== '') {
-                $query->where('is_active', $request->is_active);
+                $query->where('is_active', (bool) $request->is_active);
             }
 
             if ($request->has('search') && !empty($request->search)) {
-                $query->where(function ($q) use ($request) {
-                    $q->where('name', 'like', "%{$request->search}%")
-                        ->orWhere('email', 'like', "%{$request->search}%")
-                        ->orWhere('company_name', 'like', "%{$request->search}%")
-                        ->orWhere('phone', 'like', "%{$request->search}%");
-                });
+                $search = substr(trim($request->search), 0, 100);
+                $query->search($search);
             }
 
-            // Get paginated or all results
             if ($request->has('per_page')) {
                 $perPage = (int) $request->per_page;
                 $perPage = min($perPage, Constants::MAX_PER_PAGE);
                 $perPage = max($perPage, Constants::MIN_PER_PAGE);
-
                 $clients = $query->paginate($perPage);
             } else {
-                $clients = $query->get();
+                $clients = $query->paginate(Constants::DEFAULT_PER_PAGE);
             }
 
-            // إضافة الإحصائيات لكل عميل
-            foreach ($clients as $client) {
-                $client->invoices_count = $client->invoices()->count();
-                $client->total_invoiced = $client->invoices()->sum('total');
-                $client->total_paid = $client->invoices()->where('status', Constants::INVOICE_STATUS_PAID)->sum('total');
-                $client->total_due = $client->total_invoiced - $client->total_paid;
-            }
+            // ✅ حساب total_due من البيانات المحملة — بدون queries إضافية
+            $clients->getCollection()->transform(function ($client) {
+                $client->total_invoiced = (float) ($client->invoices_sum_total ?? 0);
+                $client->total_paid     = (float) ($client->paid_amount ?? 0);
+                $client->total_due      = $client->total_invoiced - $client->total_paid;
+                return $client;
+            });
 
             return [
-                'status' => true,
+                'status'  => true,
                 'message' => __('messages.clients_fetched'),
-                'data' => $clients
+                'data'    => $clients,
             ];
         } catch (\Exception $e) {
-            Log::error('ClientRepository index error: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
+            Log::error('ClientRepository index error', ['error' => $e->getMessage()]);
 
             return [
-                'status' => false,
-                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
-                'data' => null
+                'status'  => false,
+                'message' => __('messages.operation_failed'),
+                'data'    => null,
             ];
         }
     }
@@ -70,34 +68,55 @@ class ClientRepository implements ClientInterface
     public function show($id)
     {
         try {
-            $client = Client::with(['user', 'invoices'])->find($id);
-
-            if (!$client) {
+            if (!is_numeric($id) || (int) $id <= 0) {
                 return [
-                    'status' => false,
+                    'status'  => false,
                     'message' => __('messages.client_not_found'),
-                    'data' => null
+                    'data'    => null,
                 ];
             }
 
-            // إضافة الإحصائيات
-            $client->invoices_count = $client->invoices()->count();
-            $client->total_invoiced = $client->invoices()->sum('total');
-            $client->total_paid = $client->invoices()->where('status', Constants::INVOICE_STATUS_PAID)->sum('total');
-            $client->total_due = $client->total_invoiced - $client->total_paid;
+            // ✅ كل الإحصائيات في query واحد
+            $client = Client::withCount('invoices')
+                ->withSum('invoices', 'total')
+                ->withSum(['invoices as paid_amount' => function ($q) {
+                    $q->where('status', Constants::INVOICE_STATUS_PAID);
+                }], 'total')
+                ->withSum(['invoices as pending_amount' => function ($q) {
+                    $q->where('status', Constants::INVOICE_STATUS_SENT);
+                }], 'total')
+                ->withSum(['invoices as overdue_amount' => function ($q) {
+                    $q->where('status', Constants::INVOICE_STATUS_OVERDUE);
+                }], 'total')
+                ->with('creator:id,name')
+                ->find((int) $id);
+
+            if (!$client) {
+                return [
+                    'status'  => false,
+                    'message' => __('messages.client_not_found'),
+                    'data'    => null,
+                ];
+            }
+
+            $client->total_invoiced  = (float) ($client->invoices_sum_total ?? 0);
+            $client->total_paid      = (float) ($client->paid_amount ?? 0);
+            $client->total_due       = $client->total_invoiced - $client->total_paid;
+            $client->pending_amount  = (float) ($client->pending_amount ?? 0);
+            $client->overdue_amount  = (float) ($client->overdue_amount ?? 0);
 
             return [
-                'status' => true,
+                'status'  => true,
                 'message' => __('messages.client_fetched'),
-                'data' => $client
+                'data'    => $client,
             ];
         } catch (\Exception $e) {
-            Log::error('ClientRepository show error: ' . $e->getMessage());
+            Log::error('ClientRepository show error', ['id' => $id, 'error' => $e->getMessage()]);
 
             return [
-                'status' => false,
-                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
-                'data' => null
+                'status'  => false,
+                'message' => __('messages.operation_failed'),
+                'data'    => null,
             ];
         }
     }
@@ -107,53 +126,45 @@ class ClientRepository implements ClientInterface
         DB::beginTransaction();
 
         try {
-            // التحقق من البريد الإلكتروني الفريد
-            $existingClient = Client::where('email', $request->email)->first();
-            if ($existingClient) {
+            if (Client::where('email', strtolower(trim($request->email)))->exists()) {
                 return [
-                    'status' => false,
+                    'status'  => false,
                     'message' => __('messages.email_already_registered'),
-                    'data' => null
+                    'data'    => null,
                 ];
             }
 
-            // إنشاء العميل
             $client = Client::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'phone' => $request->phone ?? null,
-                'address' => $request->address ?? null,
-                'company_name' => $request->company_name ?? null,
-                'tax_number' => $request->tax_number ?? null,
+                'name'          => $request->name,
+                'email'         => strtolower(trim($request->email)),
+                'phone'         => $request->phone,
+                'address'       => $request->address,
+                'company_name'  => $request->company_name,
+                'tax_number'    => $request->tax_number,
                 'payment_terms' => $request->payment_terms ?? Constants::PAYMENT_TERM_NET_30,
-                'currency' => $request->currency ?? Constants::CURRENCY_SAR,
-                'notes' => $request->notes ?? null,
-                'is_active' => $request->is_active ?? true,
-                'created_by' => auth()->id() ?? 1
+                'currency'      => $request->currency      ?? Constants::CURRENCY_SAR,
+                'notes'         => $request->notes,
+                'is_active'     => $request->is_active ?? true,
+                'created_by'    => auth()->id(),
             ]);
 
-            // تسجيل النشاط
-            ActivityLog::log(
-                'CREATE',
-                __('messages.client_created') . ': ' . $client->name,
-                $client
-            );
+            ActivityLog::log('CREATE', __('messages.client_created') . ': ' . $client->name, $client);
 
             DB::commit();
 
             return [
-                'status' => true,
+                'status'  => true,
                 'message' => __('messages.client_created'),
-                'data' => $client->load(['user'])
+                'data'    => $client->load('creator:id,name'),
             ];
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('ClientRepository store error: ' . $e->getMessage());
+            Log::error('ClientRepository store error', ['error' => $e->getMessage()]);
 
             return [
-                'status' => false,
-                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
-                'data' => null
+                'status'  => false,
+                'message' => __('messages.operation_failed'),
+                'data'    => null,
             ];
         }
     }
@@ -165,36 +176,22 @@ class ClientRepository implements ClientInterface
         try {
             $oldValues = $client->toArray();
 
-            // التحقق من البريد الإلكتروني الفريد (استثناء العميل الحالي)
-            if ($request->has('email') && $request->email !== $client->email) {
-                $existingClient = Client::where('email', $request->email)
-                    ->where('id', '!=', $client->id)
-                    ->first();
-
-                if ($existingClient) {
+            if ($request->has('email') && strtolower(trim($request->email)) !== $client->email) {
+                if (Client::where('email', strtolower(trim($request->email)))->where('id', '!=', $client->id)->exists()) {
                     return [
-                        'status' => false,
+                        'status'  => false,
                         'message' => __('messages.email_already_registered'),
-                        'data' => null
+                        'data'    => null,
                     ];
                 }
             }
 
-            // الحقول المسموح بتحديثها فقط
             $allowedFields = [
-                'name',
-                'email',
-                'phone',
-                'address',
-                'company_name',
-                'tax_number',
-                'payment_terms',
-                'currency',
-                'notes',
-                'is_active'
+                'name', 'email', 'phone', 'address',
+                'company_name', 'tax_number', 'payment_terms',
+                'currency', 'notes', 'is_active',
             ];
 
-            // إنشاء array للبيانات المسموح بها فقط
             $updateData = [];
             foreach ($allowedFields as $field) {
                 if ($request->has($field)) {
@@ -202,46 +199,43 @@ class ClientRepository implements ClientInterface
                 }
             }
 
-            // تحويل is_active إلى boolean إذا كان موجوداً
             if (isset($updateData['is_active'])) {
-                $updateData['is_active'] = (bool)$updateData['is_active'];
+                $updateData['is_active'] = (bool) $updateData['is_active'];
+            }
+            if (isset($updateData['email'])) {
+                $updateData['email'] = strtolower(trim($updateData['email']));
             }
 
-            // تحديث البيانات
             $client->update($updateData);
 
-            // تسجيل النشاط
-            ActivityLog::log(
-                'UPDATE',
-                __('messages.client_updated') . ': ' . $client->name,
-                $client,
-                $oldValues,
-                $client->fresh()->toArray()
-            );
+            ActivityLog::log('UPDATE', __('messages.client_updated') . ': ' . $client->name, $client, $oldValues, $client->fresh()->toArray());
 
             DB::commit();
 
-            // إعادة تحميل العميل مع الإحصائيات المحسوبة (فقط للعرض)
-            $client->load(['user', 'invoices']);
-            $client->invoices_count = $client->invoices()->count();
-            $client->total_invoiced = $client->invoices()->sum('total');
-            $client->total_paid = $client->invoices()->where('status', Constants::INVOICE_STATUS_PAID)->sum('total');
-            $client->total_due = $client->total_invoiced - $client->total_paid;
+            // ✅ إعادة تحميل مع الإحصائيات بـ query واحد
+            $client = Client::withCount('invoices')
+                ->withSum('invoices', 'total')
+                ->withSum(['invoices as paid_amount' => fn($q) => $q->where('status', Constants::INVOICE_STATUS_PAID)], 'total')
+                ->with('creator:id,name')
+                ->find($client->id);
+
+            $client->total_invoiced = (float) ($client->invoices_sum_total ?? 0);
+            $client->total_paid     = (float) ($client->paid_amount ?? 0);
+            $client->total_due      = $client->total_invoiced - $client->total_paid;
 
             return [
-                'status' => true,
+                'status'  => true,
                 'message' => __('messages.client_updated'),
-                'data' => $client
+                'data'    => $client,
             ];
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('ClientRepository update error: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
+            Log::error('ClientRepository update error', ['error' => $e->getMessage()]);
 
             return [
-                'status' => false,
-                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
-                'data' => null
+                'status'  => false,
+                'message' => __('messages.operation_failed'),
+                'data'    => null,
             ];
         }
     }
@@ -251,43 +245,38 @@ class ClientRepository implements ClientInterface
         DB::beginTransaction();
 
         try {
-            $clientName = $client->name;
-            $clientId = $client->id;
+            // ✅ withCount بدل invoices()->count()
+            $client->loadCount('invoices');
 
-            // التحقق إذا كان العميل لديه فواتير مرتبطة
-            if ($client->invoices()->count() > 0) {
+            if ($client->invoices_count > 0) {
                 return [
-                    'status' => false,
+                    'status'  => false,
                     'message' => __('messages.client_has_invoices'),
-                    'data' => null
+                    'data'    => null,
                 ];
             }
 
-            // تسجيل النشاط قبل الحذف
-            ActivityLog::log(
-                'DELETE',
-                __('messages.client_deleted') . ': ' . $clientName,
-                $client
-            );
+            $clientName = $client->name;
+            $clientId   = $client->id;
 
-            // حذف العميل
+            ActivityLog::log('DELETE', __('messages.client_deleted') . ': ' . $clientName, $client);
             $client->delete();
 
             DB::commit();
 
             return [
-                'status' => true,
+                'status'  => true,
                 'message' => __('messages.client_deleted'),
-                'data' => ['id' => $clientId]
+                'data'    => ['id' => $clientId],
             ];
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('ClientRepository destroy error: ' . $e->getMessage());
+            Log::error('ClientRepository destroy error', ['error' => $e->getMessage()]);
 
             return [
-                'status' => false,
-                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
-                'data' => null
+                'status'  => false,
+                'message' => __('messages.operation_failed'),
+                'data'    => null,
             ];
         }
     }
@@ -295,39 +284,40 @@ class ClientRepository implements ClientInterface
     public function getClientStats($client)
     {
         try {
-            $totalInvoices = $client->invoices()->count();
-            $totalAmount = $client->invoices()->sum('total');
-            $paidAmount = $client->invoices()
-                ->where('status', Constants::INVOICE_STATUS_PAID)
-                ->sum('total');
-            $pendingAmount = $client->invoices()
-                ->where('status', Constants::INVOICE_STATUS_SENT)
-                ->sum('total');
-            $overdueAmount = $client->invoices()
-                ->where('status', Constants::INVOICE_STATUS_OVERDUE)
-                ->sum('total');
-
-            $stats = [
-                'total_invoices' => $totalInvoices,
-                'total_amount' => $totalAmount,
-                'paid_amount' => $paidAmount,
-                'pending_amount' => $pendingAmount,
-                'overdue_amount' => $overdueAmount,
-                'currency' => $client->currency ?? Constants::CURRENCY_SAR
-            ];
+            // ✅ كل الإحصائيات في query واحد بدل 5 queries
+            $stats = $client->invoices()
+                ->selectRaw('
+                    COUNT(*) as total_invoices,
+                    SUM(total) as total_amount,
+                    SUM(CASE WHEN status = ? THEN total ELSE 0 END) as paid_amount,
+                    SUM(CASE WHEN status = ? THEN total ELSE 0 END) as pending_amount,
+                    SUM(CASE WHEN status = ? THEN total ELSE 0 END) as overdue_amount
+                ', [
+                    Constants::INVOICE_STATUS_PAID,
+                    Constants::INVOICE_STATUS_SENT,
+                    Constants::INVOICE_STATUS_OVERDUE,
+                ])
+                ->first();
 
             return [
-                'status' => true,
+                'status'  => true,
                 'message' => __('messages.client_stats_fetched'),
-                'data' => $stats
+                'data'    => [
+                    'total_invoices'  => (int)   ($stats->total_invoices  ?? 0),
+                    'total_amount'    => (float)  ($stats->total_amount    ?? 0),
+                    'paid_amount'     => (float)  ($stats->paid_amount     ?? 0),
+                    'pending_amount'  => (float)  ($stats->pending_amount  ?? 0),
+                    'overdue_amount'  => (float)  ($stats->overdue_amount  ?? 0),
+                    'currency'        => $client->currency ?? Constants::CURRENCY_SAR,
+                ],
             ];
         } catch (\Exception $e) {
-            Log::error('ClientRepository getClientStats error: ' . $e->getMessage());
+            Log::error('ClientRepository getClientStats error', ['error' => $e->getMessage()]);
 
             return [
-                'status' => false,
-                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
-                'data' => null
+                'status'  => false,
+                'message' => __('messages.operation_failed'),
+                'data'    => null,
             ];
         }
     }
@@ -335,27 +325,31 @@ class ClientRepository implements ClientInterface
     public function searchClients($request)
     {
         try {
-            $search = $request->search ?? '';
+            $search = substr(trim($request->search ?? ''), 0, 100);
 
-            $clients = Client::where('name', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%")
-                ->orWhere('company_name', 'like', "%{$search}%")
-                ->orWhere('phone', 'like', "%{$search}%")
+            // ✅ select فقط الحقول المطلوبة — لا تجلب كل الـ columns
+            $clients = Client::select(['id', 'name', 'email', 'phone', 'company_name', 'is_active'])
+                ->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('company_name', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%");
+                })
                 ->limit(10)
-                ->get(['id', 'name', 'email', 'phone', 'company_name', 'is_active']);
+                ->get();
 
             return [
-                'status' => true,
+                'status'  => true,
                 'message' => __('messages.client_search_fetched'),
-                'data' => $clients
+                'data'    => $clients,
             ];
         } catch (\Exception $e) {
-            Log::error('ClientRepository searchClients error: ' . $e->getMessage());
+            Log::error('ClientRepository searchClients error', ['error' => $e->getMessage()]);
 
             return [
-                'status' => false,
-                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
-                'data' => null
+                'status'  => false,
+                'message' => __('messages.operation_failed'),
+                'data'    => null,
             ];
         }
     }
@@ -363,22 +357,24 @@ class ClientRepository implements ClientInterface
     public function getClientInvoices($client)
     {
         try {
+            // ✅ with للعلاقات المطلوبة في العرض
             $invoices = $client->invoices()
+                ->with(['items'])
                 ->orderBy('created_at', 'desc')
                 ->paginate(Constants::DEFAULT_PER_PAGE);
 
             return [
-                'status' => true,
+                'status'  => true,
                 'message' => __('messages.client_invoices_fetched'),
-                'data' => $invoices
+                'data'    => $invoices,
             ];
         } catch (\Exception $e) {
-            Log::error('ClientRepository getClientInvoices error: ' . $e->getMessage());
+            Log::error('ClientRepository getClientInvoices error', ['error' => $e->getMessage()]);
 
             return [
-                'status' => false,
-                'message' => __('messages.operation_failed') . ': ' . $e->getMessage(),
-                'data' => null
+                'status'  => false,
+                'message' => __('messages.operation_failed'),
+                'data'    => null,
             ];
         }
     }

@@ -7,6 +7,12 @@ use App\Repository\Admin\Report\ReportInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Http\Requests\Report\ReportFilterRequest;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\InvoiceReportExport;
+use App\Exports\ClientReportExport;
+use App\Exports\RevenueReportExport;
+use App\Exports\OverdueReportExport;
+use Illuminate\Support\Facades\Log;
 
 class ReportController extends Controller
 {
@@ -20,7 +26,7 @@ class ReportController extends Controller
     /**
      * تقرير الفواتير
      */
-    public function getInvoiceReport(ReportFilterRequest $request): JsonResponse
+    public function invoices(ReportFilterRequest $request): JsonResponse
     {
         try {
             $filters = $request->validated();
@@ -42,7 +48,7 @@ class ReportController extends Controller
     /**
      * تقرير العملاء
      */
-    public function getClientReport(ReportFilterRequest $request): JsonResponse
+    public function clients(ReportFilterRequest $request): JsonResponse
     {
         try {
             $filters = $request->validated();
@@ -64,7 +70,7 @@ class ReportController extends Controller
     /**
      * تقرير الإيرادات
      */
-    public function getRevenueReport(ReportFilterRequest $request): JsonResponse
+    public function revenue(ReportFilterRequest $request): JsonResponse
     {
         try {
             $filters = $request->validated();
@@ -86,7 +92,7 @@ class ReportController extends Controller
     /**
      * تقرير المتأخرات
      */
-    public function getOverdueReport(ReportFilterRequest $request): JsonResponse
+    public function overdue(ReportFilterRequest $request): JsonResponse
     {
         try {
             $filters = $request->validated();
@@ -106,33 +112,19 @@ class ReportController extends Controller
     }
 
     /**
-     * إحصائيات لوحة التحكم
-     */
-    public function getDashboardStats(): JsonResponse
-    {
-        try {
-            $stats = $this->reportRepository->getDashboardStats();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'تم تحميل الإحصائيات بنجاح',
-                'data' => $stats
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'فشل في تحميل الإحصائيات: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
      * تصدير التقرير
      */
-    public function exportReport(Request $request, string $type): JsonResponse
+    public function export(Request $request, string $type): JsonResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         try {
+            // ضبط اللغة إذا تم إرسالها
+            if ($request->has('lang')) {
+                app()->setLocale($request->input('lang'));
+            }
+
             $filters = $request->all();
+            // إزالة lang من الفلاتر حتى لا يؤثر على الاستعلام
+            unset($filters['lang']);
 
             // إضافة تواريخ افتراضية إذا لم تكن موجودة
             if (empty($filters['start_date'])) {
@@ -142,17 +134,197 @@ class ReportController extends Controller
                 $filters['end_date'] = now()->format('Y-m-d');
             }
 
-            $export = $this->reportRepository->exportReport($type, $filters);
+            // جلب البيانات حسب نوع التقرير
+            $reportData = $this->getReportData($type, $filters);
+
+            if (empty($reportData['items'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => __('reports.no_data')
+                ], 404);
+            }
+
+            // اختيار كلاس التصدير المناسب
+            $exportClass = $this->getExportClass($type, $reportData);
+
+            if ($request->has('download') && $request->input('download') === '1') {
+                return Excel::download($exportClass, $this->getFileName($type));
+            }
+
+            // حفظ في الخادم
+            $fileName = $this->getFileName($type, true);
+            $filePath = 'exports/' . $fileName;
+            Excel::store($exportClass, $filePath, 'public');
 
             return response()->json([
                 'success' => true,
-                'message' => 'تم إنشاء ملف التصدير بنجاح',
-                'data' => $export
+                'message' => __('messages.export_success'),
+                'data' => [
+                    'file_path' => $filePath,
+                    'file_name' => $fileName,
+                    'url' => asset('storage/' . $filePath)
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Export failed', [
+                'type' => $type,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => __('messages.export_failed') . ': ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * جلب بيانات التقرير حسب النوع
+     */
+    private function getReportData(string $type, array $filters): array
+    {
+        switch ($type) {
+            case 'invoices':
+                return $this->reportRepository->getInvoiceReport($filters);
+            case 'clients':
+                return $this->reportRepository->getClientReport($filters);
+            case 'revenue':
+                return $this->reportRepository->getRevenueReport($filters);
+            case 'overdue':
+                return $this->reportRepository->getOverdueReport($filters);
+            default:
+                throw new \InvalidArgumentException("نوع التقرير غير صحيح: {$type}");
+        }
+    }
+
+    /**
+     * الحصول على كلاس التصدير المناسب
+     */
+    private function getExportClass(string $type, array $data)
+    {
+        switch ($type) {
+            case 'invoices':
+                return new InvoiceReportExport($data);
+            case 'clients':
+                return new ClientReportExport($data);
+            case 'revenue':
+                return new RevenueReportExport($data);
+            case 'overdue':
+                return new OverdueReportExport($data);
+            default:
+                throw new \InvalidArgumentException("نوع التقرير غير صحيح: {$type}");
+        }
+    }
+
+    /**
+     * توليد اسم الملف
+     */
+    private function getFileName(string $type, bool $withTimestamp = false): string
+    {
+        $names = [
+            'invoices' => 'تقرير_الفواتير',
+            'clients' => 'تقرير_العملاء',
+            'revenue' => 'تقرير_الإيرادات',
+            'overdue' => 'تقرير_المتأخرات'
+        ];
+
+        $baseName = $names[$type] ?? 'تقرير';
+        $timestamp = $withTimestamp ? '_' . date('Y_m_d_His') : '';
+
+        return $baseName . $timestamp . '.xlsx';
+    }
+
+    /**
+     * تحميل التقرير مباشرة
+     */
+    private function downloadReport(string $type, array $filters): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $export = $this->reportRepository->exportReport($type, $filters);
+        $filePath = storage_path('app/public/' . $export['file_path']);
+
+        return response()->download($filePath, $export['file_name']);
+    }
+
+    /**
+     * الحصول على الملفات المصدرة
+     */
+    public function exportedFiles(): JsonResponse
+    {
+        try {
+            $exportsPath = storage_path('app/public/exports');
+            $files = [];
+
+            if (file_exists($exportsPath)) {
+                $fileList = scandir($exportsPath);
+
+                foreach ($fileList as $file) {
+                    if ($file !== '.' && $file !== '..') {
+                        $filePath = $exportsPath . '/' . $file;
+                        $files[] = [
+                            'name' => $file,
+                            'size' => $this->formatSize(filesize($filePath)),
+                            'modified' => date('Y-m-d H:i:s', filemtime($filePath)),
+                            'url' => asset('storage/exports/' . $file)
+                        ];
+                    }
+                }
+            }
+
+            // ترتيب حسب تاريخ التعديل (الأحدث أولاً)
+            usort($files, function ($a, $b) {
+                return strtotime($b['modified']) - strtotime($a['modified']);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم جلب الملفات المصدرة بنجاح',
+                'data' => $files
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في تصدير التقرير: ' . $e->getMessage()
+                'message' => 'فشل في جلب الملفات: ' . $e->getMessage(),
+                'data' => []
+            ], 500);
+        }
+    }
+
+    /**
+     * حذف ملف مصدر
+     */
+    public function deleteExportedFile(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'file_name' => 'required|string'
+            ]);
+
+            $fileName = $request->input('file_name');
+            $filePath = storage_path('app/public/exports/' . $fileName);
+
+            if (!file_exists($filePath)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'الملف غير موجود'
+                ], 404);
+            }
+
+            if (unlink($filePath)) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'تم حذف الملف بنجاح'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'فشل في حذف الملف'
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل في حذف الملف: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -196,6 +368,26 @@ class ReportController extends Controller
                 'success' => false,
                 'message' => 'فشل في تسديد الفاتورة: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * تنسيق حجم الملف
+     */
+    private function formatSize($bytes): string
+    {
+        if ($bytes >= 1073741824) {
+            return number_format($bytes / 1073741824, 2) . ' GB';
+        } elseif ($bytes >= 1048576) {
+            return number_format($bytes / 1048576, 2) . ' MB';
+        } elseif ($bytes >= 1024) {
+            return number_format($bytes / 1024, 2) . ' KB';
+        } elseif ($bytes > 1) {
+            return $bytes . ' bytes';
+        } elseif ($bytes == 1) {
+            return $bytes . ' byte';
+        } else {
+            return '0 bytes';
         }
     }
 }

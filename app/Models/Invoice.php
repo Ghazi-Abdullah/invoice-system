@@ -10,9 +10,13 @@ class Invoice extends Model
 {
     use HasFactory;
 
+    /**
+     * ✅ $fillable محدد بدقة — يمنع Mass Assignment
+     * فقط الحقول التي يُسمح للمستخدم بإرسالها
+     */
     protected $fillable = [
         'client_id',
-        'user_id', // تمت إضافته
+        'user_id',
         'invoice_number',
         'invoice_date',
         'due_date',
@@ -25,25 +29,43 @@ class Invoice extends Model
         'notes',
         'terms',
         'footer',
+        'enable_stripe_checkout',
         'sent_at',
         'paid_at',
         'created_by',
-        'is_active'
+        'is_active',
     ];
 
+    /**
+     * ✅ $hidden — حقول لا تظهر أبداً في الاستجابات
+     */
+    protected $hidden = [
+        'created_by', // لا تكشف ID من أنشأ الفاتورة في الـ API العام
+    ];
+
+    /**
+     * ✅ Casts صحيحة لكل الأنواع
+     */
     protected $casts = [
-        'invoice_date' => 'date',
-        'due_date' => 'date',
-        'sent_at' => 'datetime',
-        'paid_at' => 'datetime',
-        'subtotal' => 'decimal:2',
-        'tax_amount' => 'decimal:2',
-        'discount_amount' => 'decimal:2',
-        'total' => 'decimal:2',
-        'is_active' => 'boolean',
+        'invoice_date'           => 'date',
+        'due_date'               => 'date',
+        'sent_at'                => 'datetime',
+        'paid_at'                => 'datetime',
+        'subtotal'               => 'decimal:2',
+        'tax_amount'             => 'decimal:2',
+        'discount_amount'        => 'decimal:2',
+        'total'                  => 'decimal:2',
+        'enable_stripe_checkout' => 'boolean',
+        'is_active'              => 'boolean',
+        'client_id'              => 'integer',
+        'user_id'                => 'integer',
+        'created_by'             => 'integer',
     ];
 
+    // ================================================================
     // Scopes
+    // ================================================================
+
     public function scopeActive($query)
     {
         return $query->where('is_active', Constants::ACTIVE);
@@ -66,33 +88,42 @@ class Invoice extends Model
 
     public function scopeOverdue($query)
     {
-        return $query->where(function($q) {
+        return $query->where(function ($q) {
             $q->where('status', Constants::INVOICE_STATUS_OVERDUE)
-              ->orWhere(function($query) {
-                  $query->where('status', Constants::INVOICE_STATUS_SENT)
+                ->orWhere(function ($sub) {
+                    $sub->where('status', Constants::INVOICE_STATUS_SENT)
                         ->where('due_date', '<', now());
-              });
+                });
         });
     }
 
-    public function scopeSearch($query, $search)
+    /**
+     * ✅ Search scope محمي من SQL Injection (يستخدم bindings لا raw strings)
+     */
+    public function scopeSearch($query, string $search)
     {
-        return $query->where(function($q) use ($search) {
+        // ✅ تنظيف نص البحث: الحد بـ 100 حرف + trim
+        $search = substr(trim($search), 0, 100);
+
+        return $query->where(function ($q) use ($search) {
             $q->where('invoice_number', 'like', "%{$search}%")
-              ->orWhereHas('client', function($client) use ($search) {
-                  $client->where('name', 'like', "%{$search}%")
-                         ->orWhere('company_name', 'like', "%{$search}%");
-              });
+                ->orWhereHas('client', function ($client) use ($search) {
+                    $client->where('name', 'like', "%{$search}%")
+                        ->orWhere('company_name', 'like', "%{$search}%");
+                });
         });
     }
 
+    // ================================================================
     // Relations
+    // ================================================================
+
     public function client()
     {
         return $this->belongsTo(Client::class);
     }
 
-    public function user() // تمت إضافته
+    public function user()
     {
         return $this->belongsTo(User::class);
     }
@@ -102,67 +133,93 @@ class Invoice extends Model
         return $this->hasMany(InvoiceItem::class);
     }
 
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    public function latestPayment()
+    {
+        return $this->hasOne(Payment::class)->latestOfMany();
+    }
+
     public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    // ================================================================
     // Methods
-    public function generateInvoiceNumber()
+    // ================================================================
+
+    public function generateInvoiceNumber(): string
     {
-        $year = date('Y');
-        $month = date('m');
+        $year   = date('Y');
+        $month  = date('m');
         $prefix = "INV-{$year}{$month}-";
 
+        // ✅ استخدام DB lock لمنع تكرار رقم الفاتورة عند الطلبات المتزامنة
         $lastInvoice = self::where('invoice_number', 'like', $prefix . '%')
             ->orderBy('invoice_number', 'desc')
+            ->lockForUpdate()
             ->first();
 
-        if ($lastInvoice) {
-            $lastNumber = (int) substr($lastInvoice->invoice_number, strlen($prefix));
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1001;
-        }
+        $nextNumber = $lastInvoice
+            ? ((int) substr($lastInvoice->invoice_number, strlen($prefix))) + 1
+            : 1001;
 
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 
-    public function markAsSent()
+    public function markAsSent(): void
     {
         $this->update([
-            'status' => Constants::INVOICE_STATUS_SENT,
-            'sent_at' => now()
+            'status'  => Constants::INVOICE_STATUS_SENT,
+            'sent_at' => now(),
         ]);
     }
 
-    public function markAsPaid()
+    public function markAsPaid(): void
     {
         $this->update([
-            'status' => Constants::INVOICE_STATUS_PAID,
-            'paid_at' => now()
+            'status'  => Constants::INVOICE_STATUS_PAID,
+            'paid_at' => now(),
         ]);
     }
 
-    public function isOverdue()
+    public function isOverdue(): bool
     {
-        return $this->status === Constants::INVOICE_STATUS_OVERDUE ||
-               ($this->status === Constants::INVOICE_STATUS_SENT &&
-                $this->due_date < now());
+        return $this->status === Constants::INVOICE_STATUS_OVERDUE
+            || ($this->status === Constants::INVOICE_STATUS_SENT && $this->due_date < now());
     }
 
-    public function calculateTotals()
+    public function canBePaid(): bool
     {
-        $subtotal = $this->items()->sum('total');
-        $taxAmount = $this->tax_amount;
-        $discountAmount = $this->discount_amount;
-        $total = $subtotal + $taxAmount - $discountAmount;
+        return $this->status !== Constants::INVOICE_STATUS_PAID
+            && $this->total > 0;
+    }
 
-        $this->update([
-            'subtotal' => $subtotal,
-            'total' => $total
-        ]);
+    public function calculateTotals(): float
+    {
+        $subtotal       = $this->items()->sum('total');
+        $taxAmount      = $this->tax_amount ?? 0;
+        $discountAmount = $this->discount_amount ?? 0;
+        $total          = $subtotal + $taxAmount - $discountAmount;
+
+        $this->update(['subtotal' => $subtotal, 'total' => $total]);
 
         return $total;
+    }
+
+    /**
+     * ✅ Accessor للحالة النصية (لا يعرض بيانات حساسة)
+     */
+    public function getStripeCheckoutStatusAttribute(): string
+    {
+        if (!$this->enable_stripe_checkout) {
+            return 'معطل';
+        }
+
+        return $this->status === Constants::INVOICE_STATUS_PAID ? 'مدفوع' : 'نشط';
     }
 }

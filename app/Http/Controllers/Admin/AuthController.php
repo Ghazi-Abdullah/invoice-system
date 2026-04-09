@@ -10,18 +10,28 @@ use App\Constants\Constants;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
+use App\Http\Requests\Admin\Auth\SendOtpRequest;
+use App\Http\Requests\Admin\Auth\VerifyOtpRequest;
+use Illuminate\Http\JsonResponse;
 
 class AuthController extends Controller
 {
     use ResponseTrait;
 
+    // ✅ الحد الأقصى لمحاولات تسجيل الدخول قبل القفل
+    private const MAX_LOGIN_ATTEMPTS = 5;
+    private const LOCKOUT_MINUTES   = 15;
+
     public function login(Request $request)
     {
         try {
             $validator = Validator::make($request->all(), [
-                'email' => 'required|email',
-                'password' => 'required'
+                'email'    => 'required|email|max:255',
+                'password' => 'required|string|min:1|max:100',
             ]);
 
             if ($validator->fails()) {
@@ -32,22 +42,49 @@ class AuthController extends Controller
                 );
             }
 
-            $user = User::with(['adminGroup.permissions'])->where('email', $request->email)->first();
+            $ip    = $request->ip();
+            $email = strtolower(trim($request->email));
 
-            if (!$user) {
+            // ✅ فحص الـ Lockout قبل أي شيء
+            $lockKey = 'login_lockout_' . md5($ip . $email);
+            if (Cache::has($lockKey)) {
+                $remaining = Cache::get($lockKey . '_remaining', self::LOCKOUT_MINUTES);
                 return $this->failureResponse(
-                    __('messages.user_not_found'),
+                    "تم قفل الحساب مؤقتاً بسبب محاولات متعددة. حاول بعد {$remaining} دقيقة.",
+                    null,
+                    Constants::RESPONSE_TOO_MANY_REQUESTS
+                );
+            }
+
+            // ✅ عدّاد المحاولات الفاشلة
+            $attemptsKey = 'login_attempts_' . md5($ip . $email);
+            $attempts    = Cache::get($attemptsKey, 0);
+
+            $user = User::with(['adminGroup.permissions'])
+                ->where('email', $email)
+                ->first();
+
+            // ✅ منع Timing Attack: نفس وقت المعالجة سواء وُجد المستخدم أم لا
+            if (!$user) {
+                Hash::check('dummy', '$2y$10$dummyhashtopreventtimingattack00000000000000000000000000');
+                $this->incrementFailedAttempts($attemptsKey, $lockKey, $attempts);
+
+                return $this->failureResponse(
+                    __('messages.invalid_credentials'),
                     null,
                     Constants::RESPONSE_UNAUTHORIZED
                 );
             }
 
             if (!Hash::check($request->password, $user->password)) {
-                return $this->failureResponse(
-                    __('messages.incorrect_password'),
-                    null,
-                    Constants::RESPONSE_UNAUTHORIZED
-                );
+                $this->incrementFailedAttempts($attemptsKey, $lockKey, $attempts);
+
+                $remaining = self::MAX_LOGIN_ATTEMPTS - ($attempts + 1);
+                $message   = $remaining > 0
+                    ? __('messages.invalid_credentials') . " ({$remaining} محاولات متبقية)"
+                    : __('messages.invalid_credentials');
+
+                return $this->failureResponse($message, null, Constants::RESPONSE_UNAUTHORIZED);
             }
 
             if (!$user->is_active) {
@@ -58,39 +95,47 @@ class AuthController extends Controller
                 );
             }
 
+            // ✅ تسجيل دخول ناجح — امسح عدّاد المحاولات
+            Cache::forget($attemptsKey);
+            Cache::forget($lockKey);
+
             $permissions = $this->getUserPermissions($user);
-            $is_admin = $user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID;
+            $is_admin    = $user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID;
+
+            // ✅ احذف التوكنات القديمة قبل إنشاء جديدة (منع تراكم التوكنات)
+            $user->tokens()
+                ->where('name', 'invoice-system-token')
+                ->where('created_at', '<', now()->subDays(30))
+                ->delete();
 
             $token = $user->createToken('invoice-system-token')->plainTextToken;
+
+            // ✅ لا تسجّل كلمة المرور أبداً
+            Log::info('Login successful', [
+                'user_id' => $user->id,
+                'email'   => $user->email,
+                'ip'      => $ip,
+            ]);
 
             return $this->successResponse(
                 __('messages.login_success'),
                 [
-                    'user' => [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
-                        'phone' => $user->phone,
-                        'company_name' => $user->company_name,
-                        'admin_group_id' => $user->admin_group_id,
-                        'is_active' => $user->is_active,
-                        'is_admin' => $is_admin,
-                        'adminGroup' => $user->adminGroup,
-                    ],
-                    'token' => $token,
-                    'token_type' => 'Bearer',
-                    'permissions' => $permissions,
-                    'is_admin' => $is_admin
+                    'user' => $this->formatUser($user, $is_admin),
+                    'token'        => $token,
+                    'token_type'   => 'Bearer',
+                    'permissions'  => $permissions,
+                    'is_admin'     => $is_admin,
                 ]
             );
-
         } catch (\Exception $e) {
-            Log::error('Login error: ' . $e->getMessage(), [
-                'email' => $request->email,
-                'ip' => $request->ip()
+            Log::error('Login error', [
+                'ip'    => $request->ip(),
+                // ✅ لا نسجّل الـ email في حالة الخطأ لتجنب تسريب المعلومات
+                'error' => $e->getMessage(),
             ]);
+
             return $this->failureResponse(
-                __('messages.login_failed') . ': ' . $e->getMessage(),
+                __('messages.login_failed'),
                 null,
                 Constants::RESPONSE_SERVER_ERROR
             );
@@ -101,13 +146,11 @@ class AuthController extends Controller
     {
         try {
             $request->user()->currentAccessToken()->delete();
-
             return $this->successResponse(__('messages.logout_success'), null);
-
         } catch (\Exception $e) {
             Log::error('Logout error: ' . $e->getMessage());
             return $this->failureResponse(
-                __('messages.logout_success') . ': ' . $e->getMessage(),
+                __('messages.operation_failed'),
                 null,
                 Constants::RESPONSE_SERVER_ERROR
             );
@@ -128,33 +171,21 @@ class AuthController extends Controller
             }
 
             $user->load(['adminGroup.permissions']);
-
             $permissions = $this->getUserPermissions($user);
-            $is_admin = $user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID;
+            $is_admin    = $user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID;
 
             return $this->successResponse(
                 __('messages.user_fetched'),
                 [
-                    'user' => [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
-                        'phone' => $user->phone,
-                        'company_name' => $user->company_name,
-                        'admin_group_id' => $user->admin_group_id,
-                        'is_active' => $user->is_active,
-                        'is_admin' => $is_admin,
-                        'adminGroup' => $user->adminGroup,
-                    ],
+                    'user'        => $this->formatUser($user, $is_admin),
                     'permissions' => $permissions,
-                    'is_admin' => $is_admin
+                    'is_admin'    => $is_admin,
                 ]
             );
-
         } catch (\Exception $e) {
             Log::error('Me endpoint error: ' . $e->getMessage());
             return $this->failureResponse(
-                __('messages.error') . ': ' . $e->getMessage(),
+                __('messages.operation_failed'),
                 null,
                 Constants::RESPONSE_SERVER_ERROR
             );
@@ -175,21 +206,16 @@ class AuthController extends Controller
             }
 
             $request->user()->currentAccessToken()->delete();
-
             $token = $user->createToken('invoice-system-token')->plainTextToken;
 
             return $this->successResponse(
                 __('messages.token_refreshed'),
-                [
-                    'token' => $token,
-                    'token_type' => 'Bearer'
-                ]
+                ['token' => $token, 'token_type' => 'Bearer']
             );
-
         } catch (\Exception $e) {
             Log::error('Refresh token error: ' . $e->getMessage());
             return $this->failureResponse(
-                __('messages.error') . ': ' . $e->getMessage(),
+                __('messages.operation_failed'),
                 null,
                 Constants::RESPONSE_SERVER_ERROR
             );
@@ -200,7 +226,7 @@ class AuthController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'email' => 'required|email|exists:users,email'
+                'email' => 'required|email|max:255',
             ]);
 
             if ($validator->fails()) {
@@ -211,12 +237,18 @@ class AuthController extends Controller
                 );
             }
 
-            return $this->successResponse(__('messages.success'), null);
+            // ✅ نفس الرسالة سواء وُجد الإيميل أم لا (منع User Enumeration)
+            // لا تقل "الإيميل غير موجود" — هذا يكشف معلومات حساسة
+            Log::info('Password reset requested', ['ip' => $request->ip()]);
 
+            return $this->successResponse(
+                'إذا كان البريد الإلكتروني مسجلاً، ستصلك رسالة لإعادة تعيين كلمة المرور.',
+                null
+            );
         } catch (\Exception $e) {
             Log::error('Forgot password error: ' . $e->getMessage());
             return $this->failureResponse(
-                __('messages.error') . ': ' . $e->getMessage(),
+                __('messages.operation_failed'),
                 null,
                 Constants::RESPONSE_SERVER_ERROR
             );
@@ -227,9 +259,9 @@ class AuthController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'email' => 'required|email|exists:users,email',
+                'email'    => 'required|email|exists:users,email',
                 'password' => 'required|string|min:8|confirmed',
-                'token' => 'required|string'
+                'token'    => 'required|string',
             ]);
 
             if ($validator->fails()) {
@@ -241,11 +273,186 @@ class AuthController extends Controller
             }
 
             return $this->successResponse(__('messages.password_changed'), null);
-
         } catch (\Exception $e) {
             Log::error('Reset password error: ' . $e->getMessage());
             return $this->failureResponse(
-                __('messages.error') . ': ' . $e->getMessage(),
+                __('messages.operation_failed'),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
+        }
+    }
+
+    // ================================================================
+    // Private Helpers
+    // ================================================================
+
+    /**
+     * زيادة عدد المحاولات الفاشلة وقفل الحساب عند الوصول للحد
+     */
+    private function incrementFailedAttempts(string $attemptsKey, string $lockKey, int $currentAttempts): void
+    {
+        $newAttempts = $currentAttempts + 1;
+        Cache::put($attemptsKey, $newAttempts, now()->addMinutes(self::LOCKOUT_MINUTES));
+
+        if ($newAttempts >= self::MAX_LOGIN_ATTEMPTS) {
+            Cache::put($lockKey, true, now()->addMinutes(self::LOCKOUT_MINUTES));
+            Cache::put($lockKey . '_remaining', self::LOCKOUT_MINUTES, now()->addMinutes(self::LOCKOUT_MINUTES));
+            Cache::forget($attemptsKey);
+
+            Log::warning('Account locked due to too many failed attempts', [
+                'attempts' => $newAttempts,
+            ]);
+        }
+    }
+
+    /**
+     * تنسيق بيانات المستخدم للاستجابة
+     * ✅ لا ترجع: password, remember_token, أي بيانات حساسة
+     */
+    private function formatUser(User $user, bool $is_admin): array
+    {
+        return [
+            'id'             => $user->id,
+            'name'           => $user->name,
+            'email'          => $user->email,
+            'phone'          => $user->phone,
+            'company_name'   => $user->company_name,
+            'admin_group_id' => $user->admin_group_id,
+            'is_active'      => $user->is_active,
+            'is_admin'       => $is_admin,
+            'img_url'        => $user->img_url,
+            'adminGroup'     => $user->adminGroup,
+        ];
+    }
+
+    public function sendOtp(SendOtpRequest $request): JsonResponse
+    {
+        try {
+            $user = User::where('email', $request->email)->first();
+
+            if (!$user->is_active) {
+                return $this->failureResponse(
+                    __('messages.inactive_account'),
+                    null,
+                    Constants::RESPONSE_FORBIDDEN
+                );
+            }
+
+            // فحص الـ cooldown — لا تسمح بطلب جديد قبل دقيقتين
+            if ($user->otp_created_at && $user->otp_created_at->diffInMinutes(now()) < 2) {
+                $remaining = 2 - $user->otp_created_at->diffInMinutes(now());
+                return $this->failureResponse(
+                    "تم إرسال رمز مسبقاً، حاول بعد {$remaining} دقيقة",
+                    null,
+                    Constants::RESPONSE_TOO_MANY_REQUESTS
+                );
+            }
+
+            // توليد OTP
+            $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+            // حفظ في DB
+            $user->otp            = $otp;
+            $user->otp_via        = 'email';
+            $user->otp_created_at = now();
+            $user->otp_attempts   = 0;
+            $user->save();
+
+            // إرسال الإيميل
+            // Mail::to($user->email)->send(new OtpMail($otp));
+
+            Log::info('OTP sent', [
+                'user_id' => $user->id,
+                'ip'      => $request->ip(),
+            ]);
+
+            return $this->successResponse(
+                'تم إرسال رمز التحقق على بريدك الإلكتروني',
+                ['user_id' => $user->id]
+            );
+        } catch (\Exception $e) {
+            Log::error('Send OTP error: ' . $e->getMessage());
+            return $this->failureResponse(
+                __('messages.operation_failed'),
+                null,
+                Constants::RESPONSE_SERVER_ERROR
+            );
+        }
+    }
+
+    public function verifyOtp(VerifyOtpRequest $request): JsonResponse
+    {
+        try {
+            $user = User::with(['adminGroup.permissions'])->find($request->user_id);
+
+            // فحص انتهاء صلاحية OTP (10 دقائق)
+            if (!$user->otp_created_at || $user->otp_created_at->diffInMinutes(now()) > 10) {
+                $user->otp          = null;
+                $user->otp_attempts = 0;
+                $user->save();
+
+                return $this->failureResponse(
+                    'انتهت صلاحية الرمز، اطلب رمزاً جديداً',
+                    null,
+                    Constants::RESPONSE_UNAUTHORIZED
+                );
+            }
+
+            // فحص عدد المحاولات
+            if ($user->otp_attempts >= self::MAX_LOGIN_ATTEMPTS) {
+                return $this->failureResponse(
+                    'تم تجاوز الحد المسموح من المحاولات، اطلب رمزاً جديداً',
+                    null,
+                    Constants::RESPONSE_TOO_MANY_REQUESTS
+                );
+            }
+
+            // التحقق من الرمز
+            if ($user->otp !== $request->otp) {
+                $user->increment('otp_attempts');
+                $remaining = self::MAX_LOGIN_ATTEMPTS - $user->otp_attempts;
+
+                return $this->failureResponse(
+                    "رمز التحقق غير صحيح ({$remaining} محاولات متبقية)",
+                    null,
+                    Constants::RESPONSE_UNAUTHORIZED
+                );
+            }
+
+            // ✅ OTP صحيح — امسح البيانات وأصدر التوكن
+            $user->otp            = null;
+            $user->otp_via        = null;
+            $user->otp_created_at = null;
+            $user->otp_attempts   = 0;
+            $user->otp_verified_at = now();
+            $user->last_login_ip  = $request->ip();
+            $user->save();
+
+            $permissions = $this->getUserPermissions($user);
+            $is_admin    = $user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID;
+
+            $token = $user->createToken('invoice-system-token')->plainTextToken;
+
+            Log::info('OTP login successful', [
+                'user_id' => $user->id,
+                'ip'      => $request->ip(),
+            ]);
+
+            return $this->successResponse(
+                __('messages.login_success'),
+                [
+                    'user'        => $this->formatUser($user, $is_admin),
+                    'token'       => $token,
+                    'token_type'  => 'Bearer',
+                    'permissions' => $permissions,
+                    'is_admin'    => $is_admin,
+                ]
+            );
+        } catch (\Exception $e) {
+            Log::error('Verify OTP error: ' . $e->getMessage());
+            return $this->failureResponse(
+                __('messages.operation_failed'),
                 null,
                 Constants::RESPONSE_SERVER_ERROR
             );
@@ -253,15 +460,13 @@ class AuthController extends Controller
     }
 
     /**
-     * Get user permissions based on their group
+     * جلب صلاحيات المستخدم
      */
-    private function getUserPermissions(User $user)
+    private function getUserPermissions(User $user): array
     {
         try {
             if ($user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID) {
-                return AdminPermission::where('is_active', true)
-                    ->pluck('title')
-                    ->toArray();
+                return AdminPermission::where('is_active', true)->pluck('title')->toArray();
             }
 
             if ($user->adminGroup && $user->adminGroup->permissions) {
@@ -272,7 +477,6 @@ class AuthController extends Controller
             }
 
             return [];
-
         } catch (\Exception $e) {
             Log::error('Get user permissions error: ' . $e->getMessage());
             return [];
@@ -280,81 +484,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Check if user has specific permission
-     */
-    public function checkPermission(Request $request, $permission)
-    {
-        try {
-            $user = $request->user();
-
-            if (!$user) {
-                return $this->failureResponse(
-                    __('messages.unauthenticated'),
-                    null,
-                    Constants::RESPONSE_UNAUTHORIZED
-                );
-            }
-
-            $hasPermission = $this->hasPermission($user, $permission);
-
-            return $this->successResponse(
-                __('messages.permission_check'),
-                [
-                    'has_permission' => $hasPermission,
-                    'permission' => $permission
-                ]
-            );
-
-        } catch (\Exception $e) {
-            Log::error('Check permission error: ' . $e->getMessage());
-            return $this->failureResponse(
-                __('messages.error') . ': ' . $e->getMessage(),
-                null,
-                Constants::RESPONSE_SERVER_ERROR
-            );
-        }
-    }
-
-    /**
-     * Check user permissions in batch
-     */
-    public function checkPermissionsBatch(Request $request)
-    {
-        try {
-            $user = $request->user();
-
-            if (!$user) {
-                return $this->failureResponse(
-                    __('messages.unauthenticated'),
-                    null,
-                    Constants::RESPONSE_UNAUTHORIZED
-                );
-            }
-
-            $permissions = $request->input('permissions', []);
-            $results = [];
-
-            foreach ($permissions as $permission) {
-                $results[$permission] = $this->hasPermission($user, $permission);
-            }
-
-            return $this->successResponse(
-                __('messages.permissions_check'),
-                ['permissions' => $results]
-            );
-
-        } catch (\Exception $e) {
-            Log::error('Check permissions batch error: ' . $e->getMessage());
-            return $this->failureResponse(
-                __('messages.error') . ': ' . $e->getMessage(),
-                null,
-                Constants::RESPONSE_SERVER_ERROR
-            );
-        }
-    }
-
-    /**
-     * Helper method to check permission
+     * التحقق من الصلاحية
      */
     private function hasPermission(User $user, string $permission): bool
     {

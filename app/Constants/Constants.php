@@ -40,7 +40,7 @@ class Constants
     const MANAGE_PERMISSIONS = 'manage_permissions';
     const MANAGE_USER_GROUPS = 'manage_user_groups';
     const VIEW_PERMISSIONS = 'view_permissions';
-
+    const RESPONSE_TOO_MANY_REQUESTS = 429;
     // Pagination
     const DEFAULT_PER_PAGE = 10;
     const MAX_PER_PAGE = 100;
@@ -59,16 +59,12 @@ class Constants
     const PAYMENT_TERM_NET_30 = 'net_30';
     const PAYMENT_TERM_NET_60 = 'net_60';
 
-     // Payment Statuses
-    const PAYMENT_STATUS_PENDING = 'pending';
-    const PAYMENT_STATUS_PAID = 'paid';
-    const PAYMENT_STATUS_FAILED = 'failed';
-    const PAYMENT_STATUS_REFUNDED = 'refunded';
-
     // Currency
     const CURRENCY_SAR = 'SAR';
     const CURRENCY_USD = 'USD';
     const CURRENCY_EUR = 'EUR';
+    const CURRENCY_GBP = 'GBP';
+    const CURRENCY_AED = 'AED';
 
     // Response Status Codes
     const RESPONSE_SUCCESS = 200;
@@ -136,4 +132,25 @@ class Constants
     const EXPORT_CSV = 'csv';
     const CACHE_TTL_INVOICES = 600; // 10 minutes
 
+    // Payment Statuses (بجانب Invoice Statuses)
+    const PAYMENT_STATUS_PENDING = 'pending';
+    const PAYMENT_STATUS_COMPLETED = 'completed';
+    const PAYMENT_STATUS_FAILED = 'failed';
+    const PAYMENT_STATUS_REFUNDED = 'refunded';
+
+    // Payment Methods
+    const PAYMENT_METHOD_CARD = 'card';
+    const PAYMENT_METHOD_BANK_TRANSFER = 'bank_transfer';
+    const PAYMENT_METHOD_CASH = 'cash';
+
+    // Permissions (بجانب الصلاحيات الحالية)
+    const CREATE_PAYMENT = 'create_payment';
+    const VIEW_PAYMENTS = 'view_payments';
+    const REFUND_PAYMENT = 'refund_payment';
+
+    // Response Messages (أضف في قسم messages)
+    const MESSAGE_PAYMENT_SESSION_CREATED = 'payment_session_created';
+    const MESSAGE_PAYMENT_SUCCESS = 'payment_success';
+    const MESSAGE_PAYMENT_FAILED = 'payment_failed';
+    const MESSAGE_PAYMENT_CANCELLED = 'payment_cancelled';
 }

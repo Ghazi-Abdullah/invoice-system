@@ -38,7 +38,7 @@ class PermissionController extends Controller
 
         if ($data['status']) {
             return $this->successResponse(
-                __('messages.permissions_fetched'),
+                $data['message'],
                 $data['data']
             );
         }
@@ -60,7 +60,7 @@ class PermissionController extends Controller
 
         if ($data['status']) {
             return $this->successResponse(
-                __('messages.permission_fetched'),
+                $data['message'],
                 $data['data']
             );
         }
@@ -82,7 +82,7 @@ class PermissionController extends Controller
 
         if ($data['status']) {
             return $this->successResponse(
-                __('messages.permission_created'),
+                $data['message'],
                 $data['data'],
                 Constants::RESPONSE_CREATED
             );
@@ -101,22 +101,26 @@ class PermissionController extends Controller
             );
         }
 
-        $data = $this->permission->show($id);
+        // Get permission first
+        $permission = AdminPermission::find($id);
 
-        if (!$data['status']) {
-            return $this->failureResponse($data['message'], $data['data']);
-        }
-
-        $updateData = $this->permission->update($request, $data['data']);
-
-        if ($updateData['status']) {
-            return $this->successResponse(
-                __('messages.permission_updated'),
-                $updateData['data']
+        if (!$permission) {
+            return $this->failureResponse(
+                __('messages.permission_not_found'),
+                null
             );
         }
 
-        return $this->failureResponse($updateData['message'], $updateData['data']);
+        $data = $this->permission->update($request, $permission);
+
+        if ($data['status']) {
+            return $this->successResponse(
+                $data['message'],
+                $data['data']
+            );
+        }
+
+        return $this->failureResponse($data['message'], $data['data']);
     }
 
     public function destroy($id)
@@ -129,25 +133,29 @@ class PermissionController extends Controller
             );
         }
 
-        $data = $this->permission->show($id);
+        // Get permission first
+        $permission = AdminPermission::find($id);
 
-        if (!$data['status']) {
-            return $this->failureResponse($data['message'], $data['data']);
-        }
-
-        $deleteData = $this->permission->destroy($data['data']);
-
-        if ($deleteData['status']) {
-            return $this->successResponse(
-                __('messages.permission_deleted'),
-                $deleteData['data']
+        if (!$permission) {
+            return $this->failureResponse(
+                __('messages.permission_not_found'),
+                null
             );
         }
 
-        return $this->failureResponse($deleteData['message'], $deleteData['data']);
+        $data = $this->permission->destroy($permission);
+
+        if ($data['status']) {
+            return $this->successResponse(
+                $data['message'],
+                $data['data']
+            );
+        }
+
+        return $this->failureResponse($data['message'], $data['data']);
     }
 
-    public function getAll()
+    public function getAllPermissions()
     {
         if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
             return $this->failureResponse(
@@ -169,6 +177,14 @@ class PermissionController extends Controller
 
     public function menus()
     {
+        if (!PermissionHelper::checkPermission(Constants::MANAGE_PERMISSIONS)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
+        }
+
         $menus = AdminMenu::with(['subMenus' => function ($query) {
                 $query->where('is_active', 1)->orderBy('sort_order');
             }])
@@ -196,28 +212,12 @@ class PermissionController extends Controller
 
         if ($data['status']) {
             return $this->successResponse(
-                __('messages.permissions_fetched'),
+                $data['message'],
                 $data['data']
             );
         }
 
         return $this->failureResponse($data['message'], $data['data']);
-    }
-
-    public function getPermissionsWithMenusInternal()
-    {
-        $permissions = AdminPermission::with(['menu', 'subMenu', 'parent'])
-            ->where('is_active', true)
-            ->orderBy('admin_menu_id')
-            ->orderBy('admin_sub_menu_id')
-            ->orderBy('parent_id')
-            ->orderBy('id')
-            ->get();
-
-        return $this->successResponse(
-            __('messages.permissions_fetched'),
-            $permissions
-        );
     }
 
     public function parentPermissions()
@@ -234,7 +234,7 @@ class PermissionController extends Controller
 
         if ($data['status']) {
             return $this->successResponse(
-                __('messages.permissions_fetched'),
+                $data['message'],
                 $data['data']
             );
         }

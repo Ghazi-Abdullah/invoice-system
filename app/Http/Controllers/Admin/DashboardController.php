@@ -1,7 +1,4 @@
 <?php
-
-// app/Http/Controllers/Admin/DashboardController.php
-
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
@@ -21,7 +18,6 @@ class DashboardController extends Controller
     public function dashboard(Request $request)
     {
         try {
-            // الحصول على المستخدم الحالي
             $user = $request->user();
 
             if (!$user) {
@@ -31,33 +27,17 @@ class DashboardController extends Controller
                 ], 401);
             }
 
-            // التحقق من صلاحية عرض الداشبورد
-            if (!$this->checkPermission($user, 'view_dashboard')) {
-                return response()->json([
-                    'status' => false,
-                    'message' => 'ليس لديك صلاحية لعرض لوحة التحكم'
-                ], 403);
-            }
-
-            // جلب البيانات مع فلترة حسب الصلاحيات
             $data = $this->dashboardService->getDashboardData($user);
-
-            // إضافة معلومات المستخدم والصلاحيات
-            $data['user'] = [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'is_admin' => $user->admin_group_id == config('constants.SUPER_ADMIN_GROUP_ID'),
-                'permissions' => $this->getUserPermissions($user)
-            ];
 
             return response()->json([
                 'status' => true,
+                'message' => 'تم جلب بيانات لوحة التحكم بنجاح',
                 'data' => $data
             ]);
 
         } catch (\Exception $e) {
             Log::error('Dashboard error: ' . $e->getMessage());
+
             return response()->json([
                 'status' => false,
                 'message' => 'خطأ في جلب بيانات الداشبورد',
@@ -66,47 +46,78 @@ class DashboardController extends Controller
         }
     }
 
-    /**
-     * التحقق من صلاحية المستخدم
-     */
-    private function checkPermission($user, $permission)
+    public function stats(Request $request)
     {
-        // إذا كان مدير عام، لديه كل الصلاحيات
-        if ($user->admin_group_id == config('constants.SUPER_ADMIN_GROUP_ID')) {
-            return true;
-        }
+        try {
+            $user = $request->user();
 
-        // التحقق من الصلاحية من خلال المجموعة
-        if ($user->adminGroup && $user->adminGroup->permissions) {
-            return $user->adminGroup->permissions
-                ->where('is_active', true)
-                ->where('title', $permission)
-                ->isNotEmpty();
-        }
+            if (!$user) {
+                return response()->json(['status' => false, 'message' => 'غير مصرح'], 401);
+            }
 
-        return false;
+            $data = $this->dashboardService->getDashboardData($user);
+
+            return response()->json([
+                'status' => true,
+                'data' => $data['stats']
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Dashboard stats error: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'خطأ في جلب الإحصائيات'
+            ], 500);
+        }
     }
 
-    /**
-     * الحصول على صلاحيات المستخدم
-     */
-    private function getUserPermissions($user)
+    public function monthlyRevenue(Request $request)
     {
-        // إذا كان مدير عام، يرجع كل الصلاحيات النشطة
-        if ($user->admin_group_id == config('constants.SUPER_ADMIN_GROUP_ID')) {
-            return \App\Models\AdminPermission::where('is_active', true)
-                ->pluck('title')
-                ->toArray();
-        }
+        try {
+            $user = $request->user();
 
-        // صلاحيات المجموعة
-        if ($user->adminGroup && $user->adminGroup->permissions) {
-            return $user->adminGroup->permissions
-                ->where('is_active', true)
-                ->pluck('title')
-                ->toArray();
-        }
+            if (!$user) {
+                return response()->json(['status' => false, 'message' => 'غير مصرح'], 401);
+            }
 
-        return [];
+            $data = $this->dashboardService->getDashboardData($user);
+
+            return response()->json([
+                'status' => true,
+                'data' => $data['monthlyRevenue']
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Monthly revenue error: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'خطأ في جلب الإيرادات الشهرية'
+            ], 500);
+        }
+    }
+
+    public function recentActivity(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json(['status' => false, 'message' => 'غير مصرح'], 401);
+            }
+
+            $data = $this->dashboardService->getDashboardData($user);
+
+            return response()->json([
+                'status' => true,
+                'data' => $data['recentActivity']
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Recent activity error: ' . $e->getMessage());
+            return response()->json([
+                'status' => false,
+                'message' => 'خطأ في جلب النشاط الحديث'
+            ], 500);
+        }
     }
 }

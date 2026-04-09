@@ -27,6 +27,7 @@ class UpdateProfileRequest extends FormRequest
             'address' => 'nullable|string',
             'company_name' => 'nullable|string|max:255',
             'tax_number' => 'nullable|string|max:100',
+            'img' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ];
     }
 
