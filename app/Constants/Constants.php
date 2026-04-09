@@ -40,7 +40,7 @@ class Constants
     const MANAGE_PERMISSIONS = 'manage_permissions';
     const MANAGE_USER_GROUPS = 'manage_user_groups';
     const VIEW_PERMISSIONS = 'view_permissions';
-
+    const RESPONSE_TOO_MANY_REQUESTS = 429;
     // Pagination
     const DEFAULT_PER_PAGE = 10;
     const MAX_PER_PAGE = 100;
@@ -132,7 +132,7 @@ class Constants
     const EXPORT_CSV = 'csv';
     const CACHE_TTL_INVOICES = 600; // 10 minutes
 
-       // Payment Statuses (بجانب Invoice Statuses)
+    // Payment Statuses (بجانب Invoice Statuses)
     const PAYMENT_STATUS_PENDING = 'pending';
     const PAYMENT_STATUS_COMPLETED = 'completed';
     const PAYMENT_STATUS_FAILED = 'failed';
@@ -153,5 +153,4 @@ class Constants
     const MESSAGE_PAYMENT_SUCCESS = 'payment_success';
     const MESSAGE_PAYMENT_FAILED = 'payment_failed';
     const MESSAGE_PAYMENT_CANCELLED = 'payment_cancelled';
-
 }

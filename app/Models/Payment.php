@@ -10,6 +10,9 @@ class Payment extends Model
 {
     use HasFactory;
 
+    /**
+     * ✅ $fillable محدد — يمنع Mass Assignment
+     */
     protected $fillable = [
         'invoice_id',
         'client_id',
@@ -27,13 +30,30 @@ class Payment extends Model
         'paid_at',
     ];
 
-    protected $casts = [
-        'amount' => 'decimal:2',
-        'metadata' => 'array',
-        'paid_at' => 'datetime',
+    /**
+     * ✅ $hidden — إخفاء بيانات Stripe الحساسة من الاستجابات العامة
+     */
+    protected $hidden = [
+        'stripe_customer_id',       // لا يُكشف للعملاء
+        'metadata',                 // قد يحتوي بيانات داخلية
     ];
 
-    // ============ SCOPES (بنفس نمط Invoice.php) ============
+    /**
+     * ✅ Casts صحيحة
+     */
+    protected $casts = [
+        'amount'     => 'decimal:2',
+        'metadata'   => 'array',
+        'paid_at'    => 'datetime',
+        'invoice_id' => 'integer',
+        'client_id'  => 'integer',
+        'user_id'    => 'integer',
+    ];
+
+    // ================================================================
+    // Scopes
+    // ================================================================
+
     public function scopePending($query)
     {
         return $query->where('status', Constants::PAYMENT_STATUS_PENDING);
@@ -49,21 +69,26 @@ class Payment extends Model
         return $query->where('status', Constants::PAYMENT_STATUS_FAILED);
     }
 
-    public function scopeSearch($query, $search)
+    public function scopeSearch($query, string $search)
     {
-        return $query->where(function($q) use ($search) {
+        $search = substr(trim($search), 0, 100);
+
+        return $query->where(function ($q) use ($search) {
             $q->where('stripe_payment_intent_id', 'like', "%{$search}%")
-              ->orWhereHas('invoice', function($invoice) use ($search) {
-                  $invoice->where('invoice_number', 'like', "%{$search}%");
-              })
-              ->orWhereHas('client', function($client) use ($search) {
-                  $client->where('name', 'like', "%{$search}%")
-                         ->orWhere('company_name', 'like', "%{$search}%");
-              });
+                ->orWhereHas('invoice', function ($invoice) use ($search) {
+                    $invoice->where('invoice_number', 'like', "%{$search}%");
+                })
+                ->orWhereHas('client', function ($client) use ($search) {
+                    $client->where('name', 'like', "%{$search}%")
+                        ->orWhere('company_name', 'like', "%{$search}%");
+                });
         });
     }
 
-    // ============ RELATIONS (بنفس نمط Invoice.php) ============
+    // ================================================================
+    // Relations
+    // ================================================================
+
     public function invoice()
     {
         return $this->belongsTo(Invoice::class);
@@ -79,19 +104,21 @@ class Payment extends Model
         return $this->belongsTo(User::class);
     }
 
-    // ============ METHODS ============
-    public function markAsCompleted($paymentMethod = 'card')
+    // ================================================================
+    // Methods
+    // ================================================================
+
+    public function markAsCompleted(string $paymentMethod = 'card'): static
     {
         $this->update([
-            'status' => Constants::PAYMENT_STATUS_COMPLETED,
+            'status'         => Constants::PAYMENT_STATUS_COMPLETED,
             'payment_method' => $paymentMethod,
-            'paid_at' => now(),
+            'paid_at'        => now(),
         ]);
 
-        // تحديث حالة الفاتورة
         if ($this->invoice) {
             $this->invoice->update([
-                'status' => Constants::INVOICE_STATUS_PAID,
+                'status'  => Constants::INVOICE_STATUS_PAID,
                 'paid_at' => now(),
             ]);
         }
@@ -99,23 +126,23 @@ class Payment extends Model
         return $this;
     }
 
-    public function markAsFailed($reason = null)
+    public function markAsFailed(?string $reason = null): static
     {
         $this->update([
-            'status' => Constants::PAYMENT_STATUS_FAILED,
+            'status'         => Constants::PAYMENT_STATUS_FAILED,
             'failure_reason' => $reason,
         ]);
 
         return $this;
     }
 
-    public function isSuccessful()
+    public function isSuccessful(): bool
     {
         return $this->status === Constants::PAYMENT_STATUS_COMPLETED;
     }
 
-    public function getFormattedAmountAttribute()
+    public function getFormattedAmountAttribute(): string
     {
-        return number_format($this->amount, 2) . ' ' . $this->currency;
+        return number_format((float) $this->amount, 2) . ' ' . $this->currency;
     }
 }

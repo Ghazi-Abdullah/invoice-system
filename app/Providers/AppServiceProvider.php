@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
@@ -17,6 +18,7 @@ use App\Repository\Admin\Permission\PermissionRepository;
 use App\Repository\Admin\Payment\PaymentInterface;
 use App\Repository\Admin\Payment\PaymentRepository;
 use App\Services\ExportService;
+use App\Http\Kernel;
 use Illuminate\Support\Facades\Validator;
 use App\Constants\Constants;
 
@@ -47,6 +49,9 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot()
     {
+        // ✅ تسجيل Rate Limiters (Login, API, Exports, Password Reset)
+        Kernel::configureRateLimiting();
+
         // Register validation rules
         Validator::extend('valid_currency', function ($attribute, $value, $parameters, $validator) {
             $validCurrencies = [
@@ -77,7 +82,6 @@ class AppServiceProvider extends ServiceProvider
             return;
         }
 
-        // تنظيف الملفات الأقدم من 7 أيام
         try {
             $exportService = app(ExportService::class);
             $deleted = $exportService->cleanupOldFiles(7);

@@ -9,13 +9,16 @@ use App\Helpers\PermissionHelper;
 use App\Repository\Admin\User\UserInterface;
 use App\Http\Requests\Admin\User\StoreUserRequest;
 use App\Http\Requests\Admin\User\UpdateUserRequest;
-use App\Http\Requests\Admin\User\UpdateProfileRequest;
 use App\Http\Requests\Admin\User\ChangePasswordRequest;
 use App\Http\Requests\Admin\AdminGroup\StoreAdminGroupRequest;
 use App\Http\Requests\Admin\AdminGroup\UpdateAdminGroupRequest;
+use App\Http\Requests\Admin\User\UpdateProfileRequest;
 use App\Models\AdminGroup;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
@@ -193,18 +196,15 @@ class UserController extends Controller
         return $this->failureResponse($statusData['message'], $statusData['data']);
     }
 
+    /**
+     * جلب الملف الشخصي للمستخدم الحالي
+     */
     public function profile()
     {
-        $user = auth()->user()->load('adminGroup');
+        $user = auth()->user()->load('adminGroup.permissions');
 
-        // جلب الصلاحيات من المجموعة أو المستخدم
-        $permissions = [];
-        $is_admin = false;
-
-        if ($user->adminGroup) {
-            $permissions = $user->adminGroup->permissions->pluck('title')->toArray();
-            $is_admin = in_array($user->admin_group_id, [Constants::SUPER_ADMIN_GROUP_ID, Constants::ADMIN_GROUP_ID]);
-        }
+        $permissions = $user->adminGroup ? $user->adminGroup->permissions->pluck('title')->toArray() : [];
+        $is_admin = in_array($user->admin_group_id, [Constants::SUPER_ADMIN_GROUP_ID, Constants::ADMIN_GROUP_ID]);
 
         return $this->successResponse(
             __('messages.profile_fetched'),
@@ -218,16 +218,40 @@ class UserController extends Controller
 
     public function updateProfile(UpdateProfileRequest $request)
     {
-        $data = $this->user->updateProfile($request);
+        $user = auth()->user();
+        $data = $request->validated();
 
-        if ($data['status']) {
-            return $this->successResponse(
-                __('messages.profile_updated'),
-                $data['data']
-            );
+        // Handle image upload
+        if ($request->hasFile('img')) {
+            // Delete old image if exists
+            if ($user->img && Storage::disk('public')->exists($user->img)) {
+                Storage::disk('public')->delete($user->img);
+            }
+
+            // Store new image
+            $path = $request->file('img')->store('imgs', 'public');
+            $data['img'] = $path;
         }
 
-        return $this->failureResponse($data['message'], $data['data']);
+        $user->update($data);
+
+        // Reload relationships after update
+        $user->load('adminGroup.permissions');
+
+        $permissions = $user->adminGroup ? $user->adminGroup->permissions->pluck('title')->toArray() : [];
+        $is_admin = in_array($user->admin_group_id, [
+            Constants::SUPER_ADMIN_GROUP_ID,
+            Constants::ADMIN_GROUP_ID
+        ]);
+
+        return $this->successResponse(
+            __('messages.profile_updated'),
+            [
+                'user' => $user,
+                'permissions' => $permissions,
+                'is_admin' => $is_admin
+            ]
+        );
     }
 
     public function changePassword(ChangePasswordRequest $request)
