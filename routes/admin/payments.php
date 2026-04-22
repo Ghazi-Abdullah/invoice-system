@@ -16,4 +16,7 @@ Route::group(['prefix' => 'payments'], function () {
 
     // Stripe Webhook (بدون مصادقة)
     Route::post('/webhook', [PaymentController::class, 'handleWebhook'])->withoutMiddleware(['auth:sanctum']);
+
+
+
 });

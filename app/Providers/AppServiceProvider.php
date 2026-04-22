@@ -22,6 +22,7 @@ use App\Http\Kernel;
 use Illuminate\Support\Facades\Validator;
 use App\Constants\Constants;
 
+
 class AppServiceProvider extends ServiceProvider
 {
     public function register()

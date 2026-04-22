@@ -187,9 +187,16 @@ class ClientRepository implements ClientInterface
             }
 
             $allowedFields = [
-                'name', 'email', 'phone', 'address',
-                'company_name', 'tax_number', 'payment_terms',
-                'currency', 'notes', 'is_active',
+                'name',
+                'email',
+                'phone',
+                'address',
+                'company_name',
+                'tax_number',
+                'payment_terms',
+                'currency',
+                'notes',
+                'is_active',
             ];
 
             $updateData = [];

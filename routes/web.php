@@ -16,3 +16,16 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/pay/{id}', function ($id) {
+    $invoice = App\Models\Invoice::findOrFail($id);
+    $result = app(App\Repository\Admin\Payment\PaymentRepository::class)->createCheckoutSession($invoice);
+    return $result['status'] ? redirect($result['data']['url']) : $result['message'];
+});
+
+
+Route::get('/test-payment/{invoiceId}', function ($invoiceId) {
+    $invoice = App\Models\Invoice::findOrFail($invoiceId);
+    $result = app(App\Repository\Admin\Payment\PaymentRepository::class)->createCheckoutSession($invoice);
+    return response()->json($result);
+});

@@ -19,7 +19,8 @@ class SendOtpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => 'required|email|exists:users,email',
+            // ✅ أزلنا exists:users,email — لا نكشف إذا الإيميل مسجل أو لا
+            'email' => 'required|email|max:255',
         ];
     }
 
@@ -28,7 +29,6 @@ class SendOtpRequest extends FormRequest
         return [
             'email.required' => 'البريد الإلكتروني مطلوب',
             'email.email'    => 'البريد الإلكتروني غير صحيح',
-            'email.exists'   => 'هذا البريد الإلكتروني غير مسجل',
         ];
     }
 

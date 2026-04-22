@@ -20,7 +20,8 @@ class VerifyOtpRequest extends FormRequest
     {
         return [
             'user_id' => 'required|integer|exists:users,id',
-            'otp'     => 'required|digits:6',
+            'otp'     => 'required|string|size:6',
+            // ✅ string بدل digits — لأن OTP بعد الـ hash مش أرقام فقط
         ];
     }
 
@@ -30,7 +31,7 @@ class VerifyOtpRequest extends FormRequest
             'user_id.required' => 'معرف المستخدم مطلوب',
             'user_id.exists'   => 'المستخدم غير موجود',
             'otp.required'     => 'رمز التحقق مطلوب',
-            'otp.digits'       => 'رمز التحقق يجب أن يكون 6 أرقام',
+            'otp.size'         => 'رمز التحقق يجب أن يكون 6 خانات',
         ];
     }
 

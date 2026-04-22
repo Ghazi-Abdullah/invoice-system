@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\ActivityLogController;
 
+
 /*
 |--------------------------------------------------------------------------
 | API Routes - Invoice System
@@ -27,13 +28,15 @@ Route::prefix('admin')->group(function () {
     // ✅ Reset Password: 3 طلبات/15 دقيقة
     Route::post('reset-password', [AuthController::class, 'resetPassword'])
         ->middleware('throttle:password-reset');
-
-    // ✅ OTP: إرسال وتحقق — بدون توكن لأن المستخدم لا يملكه بعد
+    // ✅ send-otp: 5 محاولات/دقيقة
     Route::post('send-otp', [AuthController::class, 'sendOtp'])
-        ->middleware('throttle:password-reset');
+        ->middleware('throttle:login');
 
+    // ✅ verify-otp: 5 محاولات/دقيقة
     Route::post('verify-otp', [AuthController::class, 'verifyOtp'])
         ->middleware('throttle:login');
+
+    Route::get('otp-logs', [\App\Http\Controllers\Admin\OtpLogController::class, 'index']);
 });
 
 // ============================================================

@@ -13,10 +13,12 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\OtpMail;
 use App\Http\Requests\Admin\Auth\SendOtpRequest;
 use App\Http\Requests\Admin\Auth\VerifyOtpRequest;
 use Illuminate\Http\JsonResponse;
+use App\Models\OtpLog;
 
 class AuthController extends Controller
 {
@@ -331,53 +333,39 @@ class AuthController extends Controller
         try {
             $user = User::where('email', $request->email)->first();
 
-            if (!$user->is_active) {
-                return $this->failureResponse(
-                    __('messages.inactive_account'),
-                    null,
-                    Constants::RESPONSE_FORBIDDEN
-                );
+            if (!$user || !$user->is_active) {
+                return $this->successResponse('إذا كان البريد الإلكتروني مسجلاً، سيصلك رمز التحقق', null);
             }
 
-            // فحص الـ cooldown — لا تسمح بطلب جديد قبل دقيقتين
-            if ($user->otp_created_at && $user->otp_created_at->diffInMinutes(now()) < 2) {
-                $remaining = 2 - $user->otp_created_at->diffInMinutes(now());
-                return $this->failureResponse(
-                    "تم إرسال رمز مسبقاً، حاول بعد {$remaining} دقيقة",
-                    null,
-                    Constants::RESPONSE_TOO_MANY_REQUESTS
-                );
+            if ($user->otp_created_at && $user->otp_created_at->diffInSeconds(now()) < 120) {
+                $remaining = 120 - $user->otp_created_at->diffInSeconds(now());
+                $minutes   = ceil($remaining / 60);
+                return $this->failureResponse("تم إرسال رمز مسبقاً، حاول بعد {$minutes} دقيقة", null, Constants::RESPONSE_TOO_MANY_REQUESTS);
             }
 
-            // توليد OTP
-            $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            $plainOtp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-            // حفظ في DB
-            $user->otp            = $otp;
+            $user->otp            = Hash::make($plainOtp);
             $user->otp_via        = 'email';
             $user->otp_created_at = now();
             $user->otp_attempts   = 0;
             $user->save();
 
-            // إرسال الإيميل
-            // Mail::to($user->email)->send(new OtpMail($otp));
-
-            Log::info('OTP sent', [
-                'user_id' => $user->id,
-                'ip'      => $request->ip(),
+            // ✅ حفظ السجل بدون الرمز
+            OtpLog::create([
+                'user_id'    => $user->id,
+                'email'      => $user->email,
+                'status'     => 'sent',
+                'ip_address' => $request->ip(),
+                'expires_at' => now()->addMinutes(10),
             ]);
 
-            return $this->successResponse(
-                'تم إرسال رمز التحقق على بريدك الإلكتروني',
-                ['user_id' => $user->id]
-            );
+            Mail::to($user->email)->send(new OtpMail($plainOtp));
+
+            return $this->successResponse('إذا كان البريد الإلكتروني مسجلاً، سيصلك رمز التحقق', ['user_id' => $user->id]);
         } catch (\Exception $e) {
             Log::error('Send OTP error: ' . $e->getMessage());
-            return $this->failureResponse(
-                __('messages.operation_failed'),
-                null,
-                Constants::RESPONSE_SERVER_ERROR
-            );
+            return $this->failureResponse(__('messages.operation_failed'), null, Constants::RESPONSE_SERVER_ERROR);
         }
     }
 
@@ -386,8 +374,17 @@ class AuthController extends Controller
         try {
             $user = User::with(['adminGroup.permissions'])->find($request->user_id);
 
-            // فحص انتهاء صلاحية OTP (10 دقائق)
-            if (!$user->otp_created_at || $user->otp_created_at->diffInMinutes(now()) > 10) {
+            // ✅ فحص is_active
+            if (!$user->is_active) {
+                return $this->failureResponse(
+                    __('messages.inactive_account'),
+                    null,
+                    Constants::RESPONSE_FORBIDDEN
+                );
+            }
+
+            // ✅ فحص انتهاء صلاحية OTP (10 دقائق) بالـ seconds
+            if (!$user->otp_created_at || $user->otp_created_at->diffInSeconds(now()) > 600) {
                 $user->otp          = null;
                 $user->otp_attempts = 0;
                 $user->save();
@@ -399,7 +396,7 @@ class AuthController extends Controller
                 );
             }
 
-            // فحص عدد المحاولات
+            // ✅ فحص عدد المحاولات قبل التحقق
             if ($user->otp_attempts >= self::MAX_LOGIN_ATTEMPTS) {
                 return $this->failureResponse(
                     'تم تجاوز الحد المسموح من المحاولات، اطلب رمزاً جديداً',
@@ -408,10 +405,10 @@ class AuthController extends Controller
                 );
             }
 
-            // التحقق من الرمز
-            if ($user->otp !== $request->otp) {
+            // ✅ Hash::check بدل المقارنة المباشرة
+            if (!$user->otp || !Hash::check($request->otp, $user->otp)) {
                 $user->increment('otp_attempts');
-                $remaining = self::MAX_LOGIN_ATTEMPTS - $user->otp_attempts;
+                $remaining = self::MAX_LOGIN_ATTEMPTS - $user->fresh()->otp_attempts;
 
                 return $this->failureResponse(
                     "رمز التحقق غير صحيح ({$remaining} محاولات متبقية)",
@@ -420,24 +417,30 @@ class AuthController extends Controller
                 );
             }
 
-            // ✅ OTP صحيح — امسح البيانات وأصدر التوكن
-            $user->otp            = null;
-            $user->otp_via        = null;
-            $user->otp_created_at = null;
-            $user->otp_attempts   = 0;
+            // ✅ OTP صحيح — امسح وأصدر التوكن
+            $user->otp             = null;
+            $user->otp_via         = null;
+            $user->otp_created_at  = null;
+            $user->otp_attempts    = 0;
             $user->otp_verified_at = now();
-            $user->last_login_ip  = $request->ip();
+            $user->last_login_ip   = $request->ip();
             $user->save();
 
             $permissions = $this->getUserPermissions($user);
             $is_admin    = $user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID;
-
-            $token = $user->createToken('invoice-system-token')->plainTextToken;
+            $token       = $user->createToken('invoice-system-token')->plainTextToken;
 
             Log::info('OTP login successful', [
                 'user_id' => $user->id,
                 'ip'      => $request->ip(),
             ]);
+
+            // ✅ بعد نجاح التحقق أضف هذا السطر قبل save()
+            OtpLog::where('user_id', $user->id)
+                ->where('status', 'sent')
+                ->latest()
+                ->first()
+                ?->update(['status' => 'verified', 'verified_at' => now()]);
 
             return $this->successResponse(
                 __('messages.login_success'),
