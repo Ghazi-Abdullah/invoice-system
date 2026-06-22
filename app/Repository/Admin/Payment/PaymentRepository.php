@@ -53,37 +53,36 @@ class PaymentRepository implements PaymentInterface
                     ],
                     'quantity' => 1,
                 ]],
-                'mode'          => 'payment',
-                'success_url'   => config('app.frontend_url') . '/invoices/' . $invoice->id . '?payment=success',
-                'cancel_url'    => config('app.frontend_url') . '/invoices/' . $invoice->id . '?payment=cancelled',
-                'metadata'      => [
+                'mode'        => 'payment',
+                'success_url' => config('app.frontend_url') . '/invoices/' . $invoice->id . '?payment=success',
+                'cancel_url'  => config('app.frontend_url') . '/invoices/' . $invoice->id . '?payment=cancelled',
+                'metadata'    => [
                     'invoice_id' => $invoice->id,
                     'client_id'  => $invoice->client_id,
                 ],
             ]);
 
-            // إنشاء سجل الدفع
             Payment::create([
-                'invoice_id'                  => $invoice->id,
-                'client_id'                   => $invoice->client_id,
-                'user_id'                     => auth()->id(),
-                'amount'                      => $invoice->total,
-                'currency'                    => $invoice->currency ?? 'SAR',
-                'status'                      => Constants::PAYMENT_STATUS_PENDING,
-                'payment_gateway'             => 'stripe',
-                'stripe_checkout_session_id'  => $session->id,
-                'metadata'                    => ['session_id' => $session->id],
+                'invoice_id'                 => $invoice->id,
+                'client_id'                  => $invoice->client_id,
+                'user_id'                    => auth()->id(),
+                'amount'                     => $invoice->total,
+                'currency'                   => $invoice->currency ?? 'SAR',
+                'status'                     => Constants::PAYMENT_STATUS_PENDING,
+                'payment_gateway'            => 'stripe',
+                'stripe_checkout_session_id' => $session->id,
+                'metadata'                   => ['session_id' => $session->id],
             ]);
 
             return [
                 'status'  => true,
                 'message' => 'Checkout session created successfully',
                 'data'    => [
-                    'session_id'   => $session->id,
-                    'url'          => $session->url,
-                    'invoice_id'   => $invoice->id,
-                    'amount'       => $invoice->total,
-                    'currency'     => $invoice->currency ?? 'SAR',
+                    'session_id' => $session->id,
+                    'url'        => $session->url,
+                    'invoice_id' => $invoice->id,
+                    'amount'     => $invoice->total,
+                    'currency'   => $invoice->currency ?? 'SAR',
                 ],
             ];
         } catch (\Stripe\Exception\ApiErrorException $e) {
@@ -127,7 +126,21 @@ class PaymentRepository implements PaymentInterface
     private function handleCheckoutCompleted(object $session): void
     {
         $payment = Payment::where('stripe_checkout_session_id', $session->id)->first();
+
         if ($payment) {
+            /*
+            |------------------------------------------------------------------
+            | الإصلاح: حفظ payment_intent_id هنا
+            |------------------------------------------------------------------
+            | في الكود القديم كان هذا السطر مفقوداً تماماً.
+            | بدونه، stripe_payment_intent_id يبقى null في قاعدة البيانات،
+            | وعندما تحاول refundPayment() تسترجع المبلغ تفشل لأنها
+            | تبحث عن stripe_payment_intent_id ولا تجده.
+            */
+            $payment->update([
+                'stripe_payment_intent_id' => $session->payment_intent,
+            ]);
+
             $payment->markAsCompleted($session->payment_method_types[0] ?? 'card');
         }
     }
@@ -158,8 +171,25 @@ class PaymentRepository implements PaymentInterface
             if ($request->search) {
                 $query->search($request->search);
             }
+
             if ($request->status) {
                 $query->where('status', $request->status);
+            }
+
+            /*
+            |------------------------------------------------------------------
+            | الإصلاح: إضافة فلتر التاريخ
+            |------------------------------------------------------------------
+            | في الكود القديم كان date_from و date_to موجودَين في Vue store
+            | كـ filters لكن الـ Repository لا يعالجهما — يتجاهلهما تماماً.
+            | النتيجة: المستخدم يختار تاريخ ويضغط فلتر ولا يحدث شيء.
+            */
+            if ($request->date_from) {
+                $query->whereDate('created_at', '>=', $request->date_from);
+            }
+
+            if ($request->date_to) {
+                $query->whereDate('created_at', '<=', $request->date_to);
             }
 
             $payments = $query->latest()->paginate($request->per_page ?? 15);

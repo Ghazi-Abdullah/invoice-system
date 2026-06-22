@@ -5,6 +5,10 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\ActivityLogController;
 
+use App\Http\Controllers\Admin\PaymentController;
+
+// ✅ Webhook Stripe - لا يحتاج middleware
+Route::post('/stripe/webhook', [PaymentController::class, 'handleWebhook'])->name('stripe.webhook');
 
 /*
 |--------------------------------------------------------------------------

@@ -153,4 +153,8 @@ class Constants
     const MESSAGE_PAYMENT_SUCCESS = 'payment_success';
     const MESSAGE_PAYMENT_FAILED = 'payment_failed';
     const MESSAGE_PAYMENT_CANCELLED = 'payment_cancelled';
+
+
+    const INVOICE_STATUS_UNPAID = 'unpaid';
+    const INVOICE_STATUS_PENDING = 'pending';
 }

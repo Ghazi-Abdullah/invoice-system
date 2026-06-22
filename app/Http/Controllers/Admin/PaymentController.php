@@ -9,6 +9,7 @@ use App\Helpers\PermissionHelper;
 use App\Repository\Admin\Payment\PaymentInterface;
 use App\Models\Invoice;
 use Illuminate\Http\Request;
+use App\Helpers\InvoiceNotificationHelper;
 use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
@@ -22,9 +23,6 @@ class PaymentController extends Controller
         $this->payment = $payment;
     }
 
-    /**
-     * إنشاء جلسة دفع لفاتورة
-     */
     public function createCheckoutSession(Request $request, $invoiceId)
     {
         if (!PermissionHelper::checkPermission(Constants::CREATE_PAYMENT)) {
@@ -57,9 +55,6 @@ class PaymentController extends Controller
         return $this->failureResponse($data['message'], $data['data']);
     }
 
-    /**
-     * معالجة Stripe Webhook
-     */
     public function handleWebhook(Request $request)
     {
         $payload = $request->getContent();
@@ -68,15 +63,13 @@ class PaymentController extends Controller
         $data = $this->payment->handleWebhook($payload, $sigHeader);
 
         if ($data['status']) {
+            InvoiceNotificationHelper::broadcastNotification();
             return response()->json(['status' => 'success']);
         }
 
         return response()->json(['error' => $data['message']], 400);
     }
 
-    /**
-     * الحصول على تفاصيل دفع
-     */
     public function show($id)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_PAYMENTS)) {
@@ -99,9 +92,6 @@ class PaymentController extends Controller
         return $this->failureResponse($data['message'], $data['data']);
     }
 
-    /**
-     * الحصول على قائمة المدفوعات
-     */
     public function index(Request $request)
     {
         if (!PermissionHelper::checkPermission(Constants::VIEW_PAYMENTS)) {
@@ -124,9 +114,6 @@ class PaymentController extends Controller
         return $this->failureResponse($data['message'], $data['data']);
     }
 
-    /**
-     * إجراء استرجاع مبلغ
-     */
     public function refund(Request $request, $id)
     {
         if (!PermissionHelper::checkPermission(Constants::REFUND_PAYMENT)) {

@@ -29,3 +29,5 @@ Route::get('/test-payment/{invoiceId}', function ($invoiceId) {
     $result = app(App\Repository\Admin\Payment\PaymentRepository::class)->createCheckoutSession($invoice);
     return response()->json($result);
 });
+
+

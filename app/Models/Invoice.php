@@ -10,16 +10,13 @@ class Invoice extends Model
 {
     use HasFactory;
 
-    /**
-     * ✅ $fillable محدد بدقة — يمنع Mass Assignment
-     * فقط الحقول التي يُسمح للمستخدم بإرسالها
-     */
     protected $fillable = [
         'client_id',
         'user_id',
         'invoice_number',
         'invoice_date',
         'due_date',
+        'payment_date',   // ✅ إضافة: كان مفقوداً — markAsPaid يرسله ولم يُحفظ
         'status',
         'subtotal',
         'tax_amount',
@@ -36,19 +33,14 @@ class Invoice extends Model
         'is_active',
     ];
 
-    /**
-     * ✅ $hidden — حقول لا تظهر أبداً في الاستجابات
-     */
     protected $hidden = [
-        'created_by', // لا تكشف ID من أنشأ الفاتورة في الـ API العام
+        'created_by',
     ];
 
-    /**
-     * ✅ Casts صحيحة لكل الأنواع
-     */
     protected $casts = [
         'invoice_date'           => 'date',
         'due_date'               => 'date',
+        'payment_date'           => 'date',       // ✅ إضافة: cast صحيح
         'sent_at'                => 'datetime',
         'paid_at'                => 'datetime',
         'subtotal'               => 'decimal:2',
@@ -97,12 +89,8 @@ class Invoice extends Model
         });
     }
 
-    /**
-     * ✅ Search scope محمي من SQL Injection (يستخدم bindings لا raw strings)
-     */
     public function scopeSearch($query, string $search)
     {
-        // ✅ تنظيف نص البحث: الحد بـ 100 حرف + trim
         $search = substr(trim($search), 0, 100);
 
         return $query->where(function ($q) use ($search) {
@@ -158,7 +146,6 @@ class Invoice extends Model
         $month  = date('m');
         $prefix = "INV-{$year}{$month}-";
 
-        // ✅ استخدام DB lock لمنع تكرار رقم الفاتورة عند الطلبات المتزامنة
         $lastInvoice = self::where('invoice_number', 'like', $prefix . '%')
             ->orderBy('invoice_number', 'desc')
             ->lockForUpdate()
@@ -182,8 +169,9 @@ class Invoice extends Model
     public function markAsPaid(): void
     {
         $this->update([
-            'status'  => Constants::INVOICE_STATUS_PAID,
-            'paid_at' => now(),
+            'status'       => Constants::INVOICE_STATUS_PAID,
+            'paid_at'      => now(),
+            'payment_date' => now()->format('Y-m-d'),
         ]);
     }
 
@@ -199,6 +187,16 @@ class Invoice extends Model
             && $this->total > 0;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | ✅ إضافة: isPaid() — دالة مساعدة تُستخدم في Controller و Repository
+    |--------------------------------------------------------------------------
+    */
+    public function isPaid(): bool
+    {
+        return $this->status === Constants::INVOICE_STATUS_PAID;
+    }
+
     public function calculateTotals(): float
     {
         $subtotal       = $this->items()->sum('total');
@@ -211,9 +209,6 @@ class Invoice extends Model
         return $total;
     }
 
-    /**
-     * ✅ Accessor للحالة النصية (لا يعرض بيانات حساسة)
-     */
     public function getStripeCheckoutStatusAttribute(): string
     {
         if (!$this->enable_stripe_checkout) {
