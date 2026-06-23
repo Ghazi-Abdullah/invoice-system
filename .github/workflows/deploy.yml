@@ -3,7 +3,7 @@ name: Deploy Invoice System
 on:
   push:
     branches:
-      - main # تأكد أن هذا هو اسم فرعك الرئيسي (Main او Master)
+      - main
 
 jobs:
   deploy:
@@ -23,20 +23,27 @@ jobs:
           script: |
             cd /var/www/invoice-backend
 
+            # حل جذري للصلاحيات: تملك المجلد وإصلاح أذونات التخزين فوراً
+            sudo chown -R ubuntu:www-data .
+            sudo chmod -R 775 storage bootstrap/cache
+
             # تفعيل وضع الصيانة مؤقتاً
             php artisan down || true
 
-            # سحب الكود الجديد من جيتهاب
+            # سحب الكود الجديد
             git pull origin main
 
-            # تحديث مكتبات Composer مع تخطي قيود إصدار PHP للمنصة
+            # حل جذري للـ Composer: تخطي فحص المنصة تماماً لتفادي تعارض PHP 8.5
             composer install --no-dev --optimize-autoloader --ignore-platform-reqs
 
-            # تحديث قاعدة البيانات والكاش
+            # تحديث قاعدة البيانات وتنظيف الكاش
             php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
+
+            # إعادة إصلاح الصلاحيات للملفات الجديدة التي تولدت عن الكاش
+            sudo chmod -R 775 storage bootstrap/cache
 
             # إنهاء وضع الصيانة
             php artisan up
