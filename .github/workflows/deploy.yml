@@ -29,8 +29,10 @@ jobs:
             # سحب الكود الجديد من جيتهاب
             git pull origin main
 
-            # تحديث مكتبات Composer وقواعد البيانات والكاش
-            composer install --no-dev --optimize-autoloader
+            # تحديث مكتبات Composer مع تخطي قيود إصدار PHP للمنصة
+            composer install --no-dev --optimize-autoloader --ignore-platform-reqs
+
+            # تحديث قاعدة البيانات والكاش
             php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
