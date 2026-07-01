@@ -4,20 +4,17 @@ namespace App\Constants;
 
 class Constants
 {
-    // System Constants
     const ACTIVE = 1;
     const INACTIVE = 0;
     const YES = 1;
     const NO = 0;
 
-    // User and Admin Groups
     const SUPER_ADMIN_GROUP_ID = 1;
     const ADMIN_GROUP_ID = 2;
     const ACCOUNTANT_GROUP_ID = 3;
     const SALES_GROUP_ID = 4;
     const CLIENT_GROUP_ID = 5;
 
-    // Permission Titles
     const VIEW_DASHBOARD = 'view_dashboard';
     const VIEW_INVOICES = 'view_invoices';
     const CREATE_INVOICE = 'create_invoice';
@@ -41,6 +38,7 @@ class Constants
     const MANAGE_USER_GROUPS = 'manage_user_groups';
     const VIEW_PERMISSIONS = 'view_permissions';
     const RESPONSE_TOO_MANY_REQUESTS = 429;
+    
     // Pagination
     const DEFAULT_PER_PAGE = 10;
     const MAX_PER_PAGE = 100;

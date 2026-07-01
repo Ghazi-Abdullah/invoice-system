@@ -1,5 +1,5 @@
 <?php
-namespace App\Services;
+namespace App\Repository\Admin\Dashboard;
 
 use App\Models\Invoice;
 use App\Models\Client;
@@ -7,10 +7,11 @@ use App\Models\Payment;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
-class DashboardService
+class DashboardRepository implements DashboardInterface
 {
-    public function getDashboardData($user)
+    public function getDashboardData(User $user): array
     {
         try {
             $today = Carbon::today();
@@ -94,6 +95,8 @@ class DashboardService
             ];
 
         } catch (\Exception $e) {
+            Log::error('Dashboard data aggregation failed: ' . $e->getMessage());
+
             return $this->getFallbackData();
         }
     }
@@ -557,7 +560,9 @@ class DashboardService
                     ['label' => '6M', 'value' => '6m'],
                     ['label' => '1Y', 'value' => '1y'],
                 ]
-            ]
+            ],
+            // يوضّح للواجهة أن هذه بيانات احتياطية توضيحية وليست بيانات حقيقية من قاعدة البيانات
+            'is_fallback' => true,
         ];
     }
 }

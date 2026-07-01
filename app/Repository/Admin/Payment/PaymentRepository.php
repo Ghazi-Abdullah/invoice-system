@@ -82,7 +82,7 @@ class PaymentRepository implements PaymentInterface
                     'url'        => $session->url,
                     'invoice_id' => $invoice->id,
                     'amount'     => $invoice->total,
-                    'currency'   => $invoice->currency ?? 'SAR',
+                    'currency'   => $invoice->currency ?? 'kwd',
                 ],
             ];
         } catch (\Stripe\Exception\ApiErrorException $e) {
