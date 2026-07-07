@@ -33,7 +33,7 @@ return new class extends Migration
         });
 
         // جدول القوائم الفرعية
-        Schema::create('admin_sub_menu', function (Blueprint $table) {
+        Schema::create('admin_sub_menus', function (Blueprint $table) {
             $table->id();
             $table->foreignId('admin_menu_id')->constrained()->onDelete('cascade');
             $table->string('title_en');

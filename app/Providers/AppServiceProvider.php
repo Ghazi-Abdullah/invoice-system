@@ -23,6 +23,10 @@ use App\Repository\Admin\OtpLog\OtpLogInterface;
 use App\Repository\Admin\OtpLog\OtpLogRepository;
 use App\Repository\Admin\Dashboard\DashboardInterface;
 use App\Repository\Admin\Dashboard\DashboardRepository;
+use App\Repository\Admin\InstallmentPlan\InstallmentPlanInterface;
+use App\Repository\Admin\InstallmentPlan\InstallmentPlanRepository;
+use App\Repository\Admin\InstallmentInterestTier\InstallmentInterestTierInterface;
+use App\Repository\Admin\InstallmentInterestTier\InstallmentInterestTierRepository;
 use App\Services\ExportService;
 use App\Http\Kernel;
 use Illuminate\Support\Facades\Validator;
@@ -44,6 +48,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ActivityLogInterface::class, ActivityLogRepository::class);
         $this->app->bind(OtpLogInterface::class, OtpLogRepository::class);
         $this->app->bind(DashboardInterface::class, DashboardRepository::class);
+        $this->app->bind(InstallmentPlanInterface::class, InstallmentPlanRepository::class);
+        $this->app->bind(InstallmentInterestTierInterface::class, InstallmentInterestTierRepository::class);
 
         // Bind Services
         $this->app->singleton(ExportService::class, function ($app) {

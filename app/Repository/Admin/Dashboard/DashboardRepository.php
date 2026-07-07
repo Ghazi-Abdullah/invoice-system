@@ -204,10 +204,12 @@ class DashboardRepository implements DashboardInterface
 
     private function getRecentClients($limit = 5)
     {
+        $clientGrowth = $this->getClientGrowthRates();
+
         return Client::latest()
             ->take($limit)
             ->get()
-            ->map(function ($client) {
+            ->map(function ($client) use ($clientGrowth) {
                 // حساب إجمالي الإنفاق
                 $totalSpent = Invoice::where('client_id', $client->id)
                     ->where('status', 'paid')
@@ -215,9 +217,6 @@ class DashboardRepository implements DashboardInterface
 
                 // حساب إجمالي الفواتير
                 $totalInvoices = Invoice::where('client_id', $client->id)->count();
-
-                // حساب النمو (افتراضي)
-                $growth = rand(5, 25);
 
                 return [
                     'id' => $client->id,
@@ -228,10 +227,49 @@ class DashboardRepository implements DashboardInterface
                     'status' => $client->status ?: 'active',
                     'total_spent' => (float) $totalSpent,
                     'total_invoices' => $totalInvoices,
-                    'growth' => $growth,
+                    'growth' => $clientGrowth[$client->id] ?? 0.0,
                     'created_at' => $client->created_at->format('Y-m-d H:i:s'),
                 ];
             })->toArray();
+    }
+
+    /**
+     * نمو حقيقي لكل عميل: مقارنة إجمالي مدفوعاته هذا الشهر بالشهر الماضي.
+     * محسوبة بـ 2 استعلام تجميعي فقط (بدل استعلام لكل عميل)، ومشتركة بين
+     * getRecentClients() و getTopClients() لتفادي التكرار.
+     *
+     * @return array<int, float> [client_id => نسبة النمو]
+     */
+    private function getClientGrowthRates(): array
+    {
+        $currentMonthStart = Carbon::now()->startOfMonth();
+        $lastMonthStart = Carbon::now()->subMonth()->startOfMonth();
+
+        $currentMonthByClient = Invoice::where('status', 'paid')
+            ->where('paid_at', '>=', $currentMonthStart)
+            ->select('client_id', DB::raw('SUM(total) as total'))
+            ->groupBy('client_id')
+            ->pluck('total', 'client_id');
+
+        $lastMonthByClient = Invoice::where('status', 'paid')
+            ->whereBetween('paid_at', [$lastMonthStart, $currentMonthStart])
+            ->select('client_id', DB::raw('SUM(total) as total'))
+            ->groupBy('client_id')
+            ->pluck('total', 'client_id');
+
+        $growthRates = [];
+        $clientIds = $currentMonthByClient->keys()->merge($lastMonthByClient->keys())->unique();
+
+        foreach ($clientIds as $clientId) {
+            $currentMonthSpent = (float) ($currentMonthByClient[$clientId] ?? 0);
+            $lastMonthSpent = (float) ($lastMonthByClient[$clientId] ?? 0);
+
+            $growthRates[$clientId] = $lastMonthSpent > 0
+                ? round((($currentMonthSpent - $lastMonthSpent) / $lastMonthSpent) * 100, 2)
+                : ($currentMonthSpent > 0 ? 100.0 : 0.0);
+        }
+
+        return $growthRates;
     }
 
     private function getRecentInvoices($limit = 5)
@@ -381,21 +419,23 @@ class DashboardRepository implements DashboardInterface
 
     private function getTopClients($limit = 5)
     {
-        return Client::all()
-            ->map(function ($client) {
-                $totalSpent = Invoice::where('client_id', $client->id)
-                    ->where('status', 'paid')
-                    ->sum('total');
+        // إجمالي المدفوع لكل عميل على مر الزمن
+        $totalSpentByClient = Invoice::where('status', 'paid')
+            ->select('client_id', DB::raw('SUM(total) as total'))
+            ->groupBy('client_id')
+            ->pluck('total', 'client_id');
 
-                // حساب النمو (افتراضي)
-                $growth = rand(5, 25);
+        $clientGrowth = $this->getClientGrowthRates();
 
+        return Client::whereIn('id', $totalSpentByClient->keys())
+            ->get()
+            ->map(function ($client) use ($totalSpentByClient, $clientGrowth) {
                 return [
                     'id' => $client->id,
                     'name' => $client->name,
                     'company_name' => $client->company_name ?: 'غير محدد',
-                    'total_spent' => (float) $totalSpent,
-                    'growth' => $growth,
+                    'total_spent' => (float) ($totalSpentByClient[$client->id] ?? 0),
+                    'growth' => $clientGrowth[$client->id] ?? 0.0,
                     'created_at' => $client->created_at->format('Y-m-d H:i:s'),
                 ];
             })
@@ -438,13 +478,14 @@ class DashboardRepository implements DashboardInterface
             $result['revenues'][] = (float) $item->revenue;
         }
 
-        // إذا لم يكن هناك بيانات، نعيد بيانات افتراضية
+        // إذا لم يكن هناك بيانات فعلية، نعرض آخر 6 أشهر بقيمة صفر حقيقية
+        // (بدل بيانات عشوائية كانت تُظهر إيرادات وهمية لمنشأة جديدة بلا مبيعات بعد)
         if (empty($result['months'])) {
             for ($i = 5; $i >= 0; $i--) {
                 $date = Carbon::now()->subMonths($i);
                 $result['months'][] = ($monthNames[$date->format('m')] ?? $date->format('m')) . ' ' . $date->format('Y');
-                $result['invoices'][] = rand(20, 50);
-                $result['revenues'][] = rand(20000, 60000);
+                $result['invoices'][] = 0;
+                $result['revenues'][] = 0;
             }
         }
 
@@ -467,7 +508,9 @@ class DashboardRepository implements DashboardInterface
     {
         $monthNames = [
             '01' => 'يناير', '02' => 'فبراير', '03' => 'مارس',
-            '04' => 'أبريل', '05' => 'مايو', '06' => 'يونيو'
+            '04' => 'أبريل', '05' => 'مايو', '06' => 'يونيو',
+            '07' => 'يوليو', '08' => 'أغسطس', '09' => 'سبتمبر',
+            '10' => 'أكتوبر', '11' => 'نوفمبر', '12' => 'ديسمبر'
         ];
 
         $performanceData = [
@@ -479,33 +522,34 @@ class DashboardRepository implements DashboardInterface
         for ($i = 5; $i >= 0; $i--) {
             $date = Carbon::now()->subMonths($i);
             $performanceData['months'][] = ($monthNames[$date->format('m')] ?? $date->format('m')) . ' ' . $date->format('Y');
-            $performanceData['invoices'][] = rand(20, 50);
-            $performanceData['revenues'][] = rand(20000, 60000);
+            // صفر حقيقي، مو أرقام وهمية قد يُخطئ أحد ويظنها بيانات فعلية
+            $performanceData['invoices'][] = 0;
+            $performanceData['revenues'][] = 0;
         }
 
         return [
             'stats' => [
-                'totalRevenue' => 1250000,
-                'totalInvoices' => 150,
-                'totalClients' => 85,
-                'paidInvoices' => 120,
-                'pendingInvoices' => 25,
-                'overdueInvoices' => 10,
-                'draftInvoices' => 15,
-                'revenueGrowth' => 12.5,
-                'invoiceGrowth' => 8.3,
-                'clientsGrowth' => 5.2,
-                'paymentRate' => 80,
-                'avgMonthlyRevenue' => 8333.33,
-                'paidAmount' => 1000000,
-                'pendingAmount' => 150000,
-                'overdueAmount' => 75000,
-                'draftAmount' => 25000,
-                'todayPaidInvoices' => 8,
-                'todayTotalInvoices' => 12,
-                'currentMonthRevenue' => 120000,
-                'currentMonthInvoices' => 25,
-                'currentMonthClients' => 12
+                'totalRevenue' => 0,
+                'totalInvoices' => 0,
+                'totalClients' => 0,
+                'paidInvoices' => 0,
+                'pendingInvoices' => 0,
+                'overdueInvoices' => 0,
+                'draftInvoices' => 0,
+                'revenueGrowth' => 0,
+                'invoiceGrowth' => 0,
+                'clientsGrowth' => 0,
+                'paymentRate' => 0,
+                'avgMonthlyRevenue' => 0,
+                'paidAmount' => 0,
+                'pendingAmount' => 0,
+                'overdueAmount' => 0,
+                'draftAmount' => 0,
+                'todayPaidInvoices' => 0,
+                'todayTotalInvoices' => 0,
+                'currentMonthRevenue' => 0,
+                'currentMonthInvoices' => 0,
+                'currentMonthClients' => 0
             ],
             'recentClients' => [],
             'recentInvoices' => [],
@@ -517,43 +561,43 @@ class DashboardRepository implements DashboardInterface
                 [
                     'status' => 'paid',
                     'label' => 'مدفوعة',
-                    'value' => 120,
+                    'value' => 0,
                     'color' => '#10b981',
                     'icon' => 'fas fa-check-circle',
-                    'amount' => 1000000,
-                    'percentage' => 70.6
+                    'amount' => 0,
+                    'percentage' => 0
                 ],
                 [
                     'status' => 'sent',
                     'label' => 'مرسلة',
-                    'value' => 25,
+                    'value' => 0,
                     'color' => '#f59e0b',
                     'icon' => 'fas fa-clock',
-                    'amount' => 150000,
-                    'percentage' => 14.7
+                    'amount' => 0,
+                    'percentage' => 0
                 ],
                 [
                     'status' => 'overdue',
                     'label' => 'متأخرة',
-                    'value' => 10,
+                    'value' => 0,
                     'color' => '#ef4444',
                     'icon' => 'fas fa-exclamation-triangle',
-                    'amount' => 75000,
-                    'percentage' => 5.9
+                    'amount' => 0,
+                    'percentage' => 0
                 ],
                 [
                     'status' => 'draft',
                     'label' => 'مسودة',
-                    'value' => 15,
+                    'value' => 0,
                     'color' => '#6b7280',
                     'icon' => 'fas fa-file-alt',
-                    'amount' => 25000,
-                    'percentage' => 8.8
+                    'amount' => 0,
+                    'percentage' => 0
                 ]
             ],
             'performanceData' => $performanceData,
             'summary' => [
-                'performance_today' => 66.67,
+                'performance_today' => 0,
                 'chart_periods' => [
                     ['label' => '1M', 'value' => '1m'],
                     ['label' => '3M', 'value' => '3m'],
@@ -561,7 +605,7 @@ class DashboardRepository implements DashboardInterface
                     ['label' => '1Y', 'value' => '1y'],
                 ]
             ],
-            // يوضّح للواجهة أن هذه بيانات احتياطية توضيحية وليست بيانات حقيقية من قاعدة البيانات
+            // يوضّح للواجهة أن هذه بيانات احتياطية (فشل حقيقي في جلب البيانات) وليست بيانات حقيقية من قاعدة البيانات
             'is_fallback' => true,
         ];
     }
