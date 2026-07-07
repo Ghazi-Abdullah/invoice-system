@@ -78,6 +78,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'throttle:api'])->group(func
     // ── Admin Routes ─────────────────────────────────────────
     require __DIR__ . '/admin/clients.php';
     require __DIR__ . '/admin/invoices.php';
+    require __DIR__ . '/admin/installments.php';
     require __DIR__ . '/admin/users.php';
     require __DIR__ . '/admin/dashboard.php';
     require __DIR__ . '/admin/permissions.php';

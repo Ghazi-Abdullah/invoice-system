@@ -11,15 +11,15 @@ class OtpLog extends Model
 
     protected $fillable = [
         'user_id',
-        'otp',
-        'type',
+        'email',
         'status',
-        'attempts',
-        'ip',
-        'verified_at'
+        'ip_address',
+        'expires_at',
+        'verified_at',
     ];
 
     protected $casts = [
+        'expires_at' => 'datetime',
         'verified_at' => 'datetime',
     ];
 

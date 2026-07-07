@@ -17,6 +17,16 @@ use App\Repository\Admin\Permission\PermissionInterface;
 use App\Repository\Admin\Permission\PermissionRepository;
 use App\Repository\Admin\Payment\PaymentInterface;
 use App\Repository\Admin\Payment\PaymentRepository;
+use App\Repository\Admin\ActivityLog\ActivityLogInterface;
+use App\Repository\Admin\ActivityLog\ActivityLogRepository;
+use App\Repository\Admin\OtpLog\OtpLogInterface;
+use App\Repository\Admin\OtpLog\OtpLogRepository;
+use App\Repository\Admin\Dashboard\DashboardInterface;
+use App\Repository\Admin\Dashboard\DashboardRepository;
+use App\Repository\Admin\InstallmentPlan\InstallmentPlanInterface;
+use App\Repository\Admin\InstallmentPlan\InstallmentPlanRepository;
+use App\Repository\Admin\InstallmentInterestTier\InstallmentInterestTierInterface;
+use App\Repository\Admin\InstallmentInterestTier\InstallmentInterestTierRepository;
 use App\Services\ExportService;
 use App\Http\Kernel;
 use Illuminate\Support\Facades\Validator;
@@ -35,6 +45,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ReportInterface::class, ReportRepository::class);
         $this->app->bind(PermissionInterface::class, PermissionRepository::class);
         $this->app->bind(PaymentInterface::class, PaymentRepository::class);
+        $this->app->bind(ActivityLogInterface::class, ActivityLogRepository::class);
+        $this->app->bind(OtpLogInterface::class, OtpLogRepository::class);
+        $this->app->bind(DashboardInterface::class, DashboardRepository::class);
+        $this->app->bind(InstallmentPlanInterface::class, InstallmentPlanRepository::class);
+        $this->app->bind(InstallmentInterestTierInterface::class, InstallmentInterestTierRepository::class);
 
         // Bind Services
         $this->app->singleton(ExportService::class, function ($app) {
