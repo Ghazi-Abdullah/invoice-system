@@ -20,6 +20,7 @@ class Constants
     const CREATE_INVOICE = 'create_invoice';
     const EDIT_INVOICE = 'edit_invoice';
     const DELETE_INVOICE = 'delete_invoice';
+    const CREATE_INSTALLMENT = 'create_installment';
     const SEND_INVOICE = 'send_invoice';
     const DOWNLOAD_INVOICE = 'download_invoice';
     const VIEW_CLIENTS = 'view_clients';
