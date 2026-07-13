@@ -2,17 +2,17 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\DashboardService;
+use App\Repository\Admin\Dashboard\DashboardInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class DashboardController extends Controller
 {
-    protected $dashboardService;
+    protected DashboardInterface $dashboardRepository;
 
-    public function __construct(DashboardService $dashboardService)
+    public function __construct(DashboardInterface $dashboardRepository)
     {
-        $this->dashboardService = $dashboardService;
+        $this->dashboardRepository = $dashboardRepository;
     }
 
     public function dashboard(Request $request)
@@ -27,7 +27,7 @@ class DashboardController extends Controller
                 ], 401);
             }
 
-            $data = $this->dashboardService->getDashboardData($user);
+            $data = $this->dashboardRepository->getDashboardData($user);
 
             return response()->json([
                 'status' => true,
@@ -55,7 +55,7 @@ class DashboardController extends Controller
                 return response()->json(['status' => false, 'message' => 'غير مصرح'], 401);
             }
 
-            $data = $this->dashboardService->getDashboardData($user);
+            $data = $this->dashboardRepository->getDashboardData($user);
 
             return response()->json([
                 'status' => true,
@@ -80,7 +80,7 @@ class DashboardController extends Controller
                 return response()->json(['status' => false, 'message' => 'غير مصرح'], 401);
             }
 
-            $data = $this->dashboardService->getDashboardData($user);
+            $data = $this->dashboardRepository->getDashboardData($user);
 
             return response()->json([
                 'status' => true,
@@ -105,7 +105,7 @@ class DashboardController extends Controller
                 return response()->json(['status' => false, 'message' => 'غير مصرح'], 401);
             }
 
-            $data = $this->dashboardService->getDashboardData($user);
+            $data = $this->dashboardRepository->getDashboardData($user);
 
             return response()->json([
                 'status' => true,

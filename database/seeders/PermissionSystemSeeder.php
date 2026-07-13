@@ -373,6 +373,17 @@ class PermissionSystemSeeder extends Seeder
                 'parent_id'         => null,
                 'is_parent'         => false,
             ],
+            // Installments
+            [
+                'id'                => 19,
+                'title'             => 'create_installment',
+                'description_en'    => 'Create Installment Plan',
+                'description_ar'    => 'إنشاء خطة أقساط',
+                'admin_menu_id'     => 2,
+                'admin_sub_menu_id' => null,
+                'parent_id'         => null,
+                'is_parent'         => false,
+            ],
         ];
 
         foreach ($permissions as $permission) {
@@ -394,7 +405,7 @@ class PermissionSystemSeeder extends Seeder
         }
 
         // 6. Assign permissions to Accountant (group id 3)
-        $accountantPermissionIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 16, 17];
+        $accountantPermissionIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 16, 17, 19];
         foreach ($accountantPermissionIds as $permissionId) {
             DB::table('admin_group_permissions')->insert([
                 'admin_group_id'       => 3,

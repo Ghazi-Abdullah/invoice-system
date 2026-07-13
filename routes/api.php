@@ -39,8 +39,6 @@ Route::prefix('admin')->group(function () {
     // ✅ verify-otp: 5 محاولات/دقيقة
     Route::post('verify-otp', [AuthController::class, 'verifyOtp'])
         ->middleware('throttle:login');
-
-    Route::get('otp-logs', [\App\Http\Controllers\Admin\OtpLogController::class, 'index']);
 });
 
 // ============================================================
@@ -75,9 +73,13 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'throttle:api'])->group(func
     // ── Activity Logs ────────────────────────────────────────
     Route::get('/activity-logs', [ActivityLogController::class, 'index']);
 
+    // ── OTP Logs ─────────────────────────────────────────────
+    Route::get('/otp-logs', [\App\Http\Controllers\Admin\OtpLogController::class, 'index']);
+
     // ── Admin Routes ─────────────────────────────────────────
     require __DIR__ . '/admin/clients.php';
     require __DIR__ . '/admin/invoices.php';
+    require __DIR__ . '/admin/installments.php';
     require __DIR__ . '/admin/users.php';
     require __DIR__ . '/admin/dashboard.php';
     require __DIR__ . '/admin/permissions.php';

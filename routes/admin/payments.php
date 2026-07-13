@@ -5,14 +5,10 @@ use App\Http\Controllers\Admin\PaymentController;
 
 /*
 |--------------------------------------------------------------------------
-| Stripe Webhook — خارج الـ Group تماماً
-|--------------------------------------------------------------------------
-| يجب أن يكون هنا قبل أي middleware أو prefix
-| لأن Stripe يرسله من خارج التطبيق بدون token
+| ملاحظة: راوت الـ webhook (admin/payments/webhook) مسجّل فعلياً بملف
+| routes/api.php مباشرة (خارج أي middleware)، فلا داعي لتكراره هنا —
+| كان هذا التعريف ميت تماماً (Laravel يطابق أول تسجيل لنفس الرابط).
 */
-Route::post('/payments/webhook', [PaymentController::class, 'handleWebhook'])
-    ->withoutMiddleware(['auth:sanctum'])
-    ->name('payments.webhook');
 
 /*
 |--------------------------------------------------------------------------
