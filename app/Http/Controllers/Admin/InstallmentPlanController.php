@@ -58,7 +58,7 @@ class InstallmentPlanController extends Controller
      */
     public function store(StoreInstallmentPlanRequest $request, Invoice $invoice)
     {
-        if (!PermissionHelper::checkPermission(Constants::EDIT_INVOICE)) {
+        if (!PermissionHelper::checkPermission(Constants::CREATE_INSTALLMENT)) {
             return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
         }
 

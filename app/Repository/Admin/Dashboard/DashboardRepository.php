@@ -407,7 +407,7 @@ class DashboardRepository implements DashboardInterface
                 'timestamp' => $client->created_at->timestamp,
                 'created_at' => $client->created_at->format('Y-m-d H:i:s'),
             ];
-        }
+        } 
 
         // ترتيب حسب التاريخ الأحدث
         usort($activities, function($a, $b) {

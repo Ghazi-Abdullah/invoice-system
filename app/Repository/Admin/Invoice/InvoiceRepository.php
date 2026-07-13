@@ -171,7 +171,7 @@ class InvoiceRepository implements InvoiceInterface
                 'enable_stripe_checkout' => (bool) ($request->enable_stripe_checkout ?? false),
                 'terms'                  => $request->terms,
                 'footer'                 => $request->footer,
-                // ✅ دائماً من auth() — لا تقبله من الـ request
+                'user_id'                => auth()->id(),
                 'created_by'             => auth()->id(),
                 'is_active'              => true,
             ]);
@@ -266,6 +266,7 @@ class InvoiceRepository implements InvoiceInterface
                 'terms'           => $request->terms  ?? $invoice->terms,
                 'footer'          => $request->footer ?? $invoice->footer,
                 'is_active'       => $request->has('is_active') ? (bool) $request->is_active : $invoice->is_active,
+                'user_id'         => auth()->id(),
             ]);
 
             // ── تحديث العناصر ──────────────────────────────────────────────
