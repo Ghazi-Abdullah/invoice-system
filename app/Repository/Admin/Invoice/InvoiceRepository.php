@@ -172,6 +172,8 @@ class InvoiceRepository implements InvoiceInterface
                 'terms'                  => $request->terms,
                 'footer'                 => $request->footer,
                 // ✅ دائماً من auth() — لا تقبله من الـ request
+                'user_id'                => auth()->id(),
+                'updated_by'             => auth()->id(),
                 'created_by'             => auth()->id(),
                 'is_active'              => true,
             ]);
@@ -202,7 +204,7 @@ class InvoiceRepository implements InvoiceInterface
                 'message' => __('messages.invoice_created'),
                 'data'    => $invoice->load(['client', 'items', 'createdBy']),
             ];
-        } catch (\Exception $e) {
+        } catch (\Exception $e) { // ← استخدم Throwable بدلاً من Exception
             DB::rollBack();
             Log::error('InvoiceRepository store error', ['error' => $e->getMessage()]);
 
@@ -597,17 +599,20 @@ class InvoiceRepository implements InvoiceInterface
             $quantity  = max(0.01, (float) ($item['quantity'] ?? 0));
             $unitPrice = max(0, (float) ($item['unit_price'] ?? 0));
             $taxRate   = min(100, max(0, (float) ($item['tax_rate'] ?? 0)));
-            $itemTotal = $quantity * $unitPrice;
-            $itemsTotal += $itemTotal;
 
-            InvoiceItem::create([
+            // ✅ استخدم Model لحساب الـ total بشكل موحد
+            $invoiceItem = InvoiceItem::create([
                 'invoice_id'  => $invoiceId,
                 'description' => substr(trim($item['description'] ?? ''), 0, 500),
                 'quantity'    => $quantity,
                 'unit_price'  => $unitPrice,
-                'total'       => $itemTotal,
                 'tax_rate'    => $taxRate,
+                'total'       => 0, // سيتم حسابه تلقائياً في boot()
+                'item_type'   => $item['item_type'] ?? 'product',
+                'notes'       => $item['notes'] ?? null,
             ]);
+
+            $itemsTotal += $invoiceItem->total;
         }
 
         return $itemsTotal;

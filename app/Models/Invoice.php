@@ -31,6 +31,7 @@ class Invoice extends Model
         'paid_at',
         'created_by',
         'is_active',
+        'user_id', // ✅ إضافة: user_id — دائماً من auth()، لا تقبله من الـ request
     ];
 
     protected $hidden = [

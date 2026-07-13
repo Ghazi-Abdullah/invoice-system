@@ -17,14 +17,14 @@ class InvoiceItem extends Model
         'tax_rate',
         'total',
         'item_type',
-        'notes'
+        'notes',
     ];
 
     protected $casts = [
-        'quantity' => 'decimal:2',
-        'unit_price' => 'decimal:2',
-        'tax_rate' => 'decimal:2',
-        'total' => 'decimal:2',
+        'quantity'    => 'decimal:2',
+        'unit_price'  => 'decimal:2',
+        'tax_rate'    => 'decimal:2',
+        'total'       => 'decimal:2',
     ];
 
     // Relations
@@ -33,13 +33,39 @@ class InvoiceItem extends Model
         return $this->belongsTo(Invoice::class);
     }
 
-    // Methods
-    public function calculateTotal()
+    // ✅ Auto-calculate total before saving
+    protected static function boot()
     {
-        $subtotal = $this->quantity * $this->unit_price;
-        $taxAmount = $subtotal * ($this->tax_rate / 100);
-        $this->total = $subtotal + $taxAmount;
+        parent::boot();
 
-        return $this->total;
+        static::creating(function ($item) {
+            $item->total = $item->calculateTotal();
+        });
+
+        static::updating(function ($item) {
+            if ($item->isDirty(['quantity', 'unit_price', 'tax_rate'])) {
+                $item->total = $item->calculateTotal();
+            }
+        });
+    }
+
+    // ✅ Unified calculation (matches repository logic)
+    public function calculateTotal(): float
+    {
+        $subtotal  = (float) $this->quantity * (float) $this->unit_price;
+        $taxAmount = $subtotal * ((float) ($this->tax_rate ?? 0) / 100);
+
+        return $subtotal + $taxAmount;
+    }
+
+    // ✅ Getters for frontend
+    public function getSubtotalAttribute(): float
+    {
+        return (float) $this->quantity * (float) $this->unit_price;
+    }
+
+    public function getTaxAmountAttribute(): float
+    {
+        return $this->getSubtotalAttribute() * ((float) ($this->tax_rate ?? 0) / 100);
     }
 }
