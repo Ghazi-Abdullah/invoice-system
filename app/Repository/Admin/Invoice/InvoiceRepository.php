@@ -171,6 +171,7 @@ class InvoiceRepository implements InvoiceInterface
                 'enable_stripe_checkout' => (bool) ($request->enable_stripe_checkout ?? false),
                 'terms'                  => $request->terms,
                 'footer'                 => $request->footer,
+                'user_id'                => auth()->id(), // ✅ دائماً من auth() — لا تقبله من الـ request
                 // ✅ دائماً من auth() — لا تقبله من الـ request
                 'created_by'             => auth()->id(),
                 'is_active'              => true,
