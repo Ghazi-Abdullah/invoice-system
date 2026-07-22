@@ -17,6 +17,7 @@ return [
     'login_failed' => 'Invalid credentials',
     'logout_success' => 'Logged out successfully',
     'token_refreshed' => 'Token refreshed successfully',
+    'session_expired_idle' => 'Your session has expired due to inactivity. Please log in again.',
     'user_fetched' => 'User data retrieved successfully',
     'profile_fetched' => 'Profile retrieved successfully',
     'profile_updated' => 'Profile updated successfully',

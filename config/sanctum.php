@@ -13,6 +13,10 @@ return [
 
     'expiration' => null,
 
+    // ✅ إنهاء الجلسة تلقائياً بعد هذا العدد من الدقائق بدون أي نشاط
+    // (يُستخدم بواسطة App\Http\Middleware\CheckIdleTimeout)
+    'idle_timeout' => env('SANCTUM_IDLE_TIMEOUT', 60),
+
     'middleware' => [
         'verify_csrf_token' => App\Http\Middleware\VerifyCsrfToken::class,
         'encrypt_cookies' => App\Http\Middleware\EncryptCookies::class,
