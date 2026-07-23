@@ -2,327 +2,221 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Traits\ResponseTrait;
 use App\Http\Controllers\Controller;
-use App\Constants\Constants;
-use App\Helpers\PermissionHelper;
 use App\Repository\Admin\Invoice\InvoiceInterface;
-use App\Http\Requests\Admin\Invoice\StoreInvoiceRequest;
-use App\Http\Requests\Admin\Invoice\UpdateInvoiceRequest;
-use App\Http\Requests\Admin\Invoice\SendInvoiceRequest;
-use App\Helpers\InvoiceNotificationHelper;
-use App\Models\Invoice;
-use App\Models\ActivityLog;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use App\Models\Invoice;
+use App\Models\InstallmentPlan;
 
 class InvoiceController extends Controller
 {
-    use ResponseTrait;
+    protected $invoiceRepository;
 
-    public $invoice;
-
-    public function __construct(InvoiceInterface $invoice)
+    public function __construct(InvoiceInterface $invoiceRepository)
     {
-        $this->invoice = $invoice;
+        $this->invoiceRepository = $invoiceRepository;
     }
 
     public function index(Request $request)
     {
-        if (!PermissionHelper::checkPermission(Constants::VIEW_INVOICES)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
-        }
+        $result = $this->invoiceRepository->index($request);
+        return response()->json($result, $result['status'] ? 200 : 500);
+    }
 
-        $data = $this->invoice->index($request);
-
-        if ($data['status']) {
-            return $this->successResponse(__('messages.invoices_fetched'), $data['data']);
-        }
-
-        return $this->failureResponse($data['message'], $data['data']);
+    public function store(Request $request)
+    {
+        $result = $this->invoiceRepository->store($request);
+        return response()->json($result, $result['status'] ? 201 : 500);
     }
 
     public function show($id)
     {
-        if (!PermissionHelper::checkPermission(Constants::VIEW_INVOICES)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
-        }
-
-        $data = $this->invoice->show($id);
-
-        if ($data['status']) {
-            return $this->successResponse(__('messages.invoice_fetched'), $data['data']);
-        }
-
-        return $this->failureResponse($data['message'], $data['data']);
+        $result = $this->invoiceRepository->show($id);
+        return response()->json($result, $result['status'] ? 200 : ($result['message'] === __('messages.not_found') ? 404 : 500));
     }
 
-    public function store(StoreInvoiceRequest $request)
+    public function update(Request $request, $id)
     {
-        if (!PermissionHelper::checkPermission(Constants::CREATE_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
+        $invoice = Invoice::find($id);
+        if (!$invoice) {
+            return response()->json([
+                'status'  => false,
+                'message' => __('messages.not_found'),
+            ], 404);
         }
 
-        $data = $this->invoice->store($request);
-
-        if ($data['status']) {
-            InvoiceNotificationHelper::broadcastNotification();
-            return $this->successResponse(
-                __('messages.invoice_created'),
-                $data['data'],
-                Constants::RESPONSE_CREATED
-            );
-        }
-
-        return $this->failureResponse($data['message'], $data['data']);
-    }
-
-    public function update(UpdateInvoiceRequest $request, $id)
-    {
-        if (!PermissionHelper::checkPermission(Constants::EDIT_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
-        }
-
-        $data = $this->invoice->show($id);
-
-        if (!$data['status']) {
-            return $this->failureResponse($data['message'], $data['data']);
-        }
-
-        // منع تعديل الفاتورة المدفوعة
-        if ($data['data']->isPaid()) {
-            return $this->failureResponse(
-                __('messages.invoice_paid_cannot_edit'),
-                null,
-                Constants::RESPONSE_BAD_REQUEST
-            );
-        }
-
-        $updateData = $this->invoice->update($request, $data['data']);
-
-        if ($updateData['status']) {
-            return $this->successResponse(__('messages.invoice_updated'), $updateData['data']);
-        }
-
-        return $this->failureResponse($updateData['message'], $updateData['data']);
+        $result = $this->invoiceRepository->update($request, $invoice);
+        return response()->json($result, $result['status'] ? 200 : 500);
     }
 
     public function destroy($id)
     {
-        if (!PermissionHelper::checkPermission(Constants::DELETE_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
+        $invoice = Invoice::find($id);
+        if (!$invoice) {
+            return response()->json([
+                'status'  => false,
+                'message' => __('messages.not_found'),
+            ], 404);
         }
 
-        $data = $this->invoice->show($id);
-
-        if (!$data['status']) {
-            return $this->failureResponse($data['message'], $data['data']);
-        }
-
-        $deleteData = $this->invoice->destroy($data['data']);
-
-        if ($deleteData['status']) {
-            return $this->successResponse(__('messages.invoice_deleted'), $deleteData['data']);
-        }
-
-        return $this->failureResponse($deleteData['message'], $deleteData['data']);
+        $result = $this->invoiceRepository->destroy($invoice);
+        return response()->json($result, $result['status'] ? 200 : 500);
     }
 
-    public function send(SendInvoiceRequest $request, $id)
+    public function dashboardStats()
     {
-        if (!PermissionHelper::checkPermission(Constants::SEND_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
-        }
-
-        $data = $this->invoice->show($id);
-
-        if (!$data['status']) {
-            return $this->failureResponse($data['message'], $data['data']);
-        }
-
-        $sendData = $this->invoice->sendInvoice($data['data']);
-
-        if ($sendData['status']) {
-            return $this->successResponse(__('messages.invoice_sent'), $sendData['data']);
-        }
-
-        return $this->failureResponse($sendData['message'], $sendData['data']);
+        $result = $this->invoiceRepository->getDashboardStats();
+        return response()->json($result, $result['status'] ? 200 : 500);
     }
 
-    public function markAsPaid(Request $request, $id)
+    public function overdueInvoices()
     {
-        if (!PermissionHelper::checkPermission(Constants::EDIT_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
-        }
-
-        DB::beginTransaction();
-
-        try {
-            $invoice = Invoice::find($id);
-
-            if (!$invoice) {
-                return $this->failureResponse(
-                    __('messages.invoice_not_found'),
-                    null,
-                    Constants::RESPONSE_NOT_FOUND
-                );
-            }
-
-            if ($invoice->isPaid()) {
-                return $this->failureResponse(
-                    __('messages.invoice_already_paid'),
-                    null,
-                    Constants::RESPONSE_BAD_REQUEST
-                );
-            }
-
-            $paymentDate = $request->has('payment_date')
-                ? $request->payment_date
-                : now()->format('Y-m-d');
-
-            $invoice->update([
-                'status'       => Constants::INVOICE_STATUS_PAID,
-                'payment_date' => $paymentDate,
-                'paid_at'      => now(),
-            ]);
-
-            ActivityLog::log(
-                'UPDATE',
-                'تم تحديث حالة الفاتورة #' . $invoice->invoice_number . ' إلى "تم الدفع"',
-                $invoice
-            );
-
-            DB::commit();
-
-            // ✅ إضافة البث بعد تحديث الحالة
-            InvoiceNotificationHelper::broadcastNotification();
-
-            return $this->successResponse(
-                __('messages.invoice_marked_paid'),
-                $invoice->load(['client', 'items'])
-            );
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('InvoiceController markAsPaid error: ' . $e->getMessage());
-
-            return $this->failureResponse(
-                __('messages.operation_failed') . ': ' . $e->getMessage(),
-                null,
-                Constants::RESPONSE_SERVER_ERROR
-            );
-        }
-    }
-
-    public function duplicate($id)
-    {
-        if (!PermissionHelper::checkPermission(Constants::CREATE_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
-        }
-
-        $data = $this->invoice->show($id);
-
-        if (!$data['status']) {
-            return $this->failureResponse($data['message'], $data['data']);
-        }
-
-        $duplicateData = $this->invoice->duplicate($data['data']);
-
-        if ($duplicateData['status']) {
-            return $this->successResponse(__('messages.invoice_duplicated'), $duplicateData['data']);
-        }
-
-        return $this->failureResponse($duplicateData['message'], $duplicateData['data']);
-    }
-
-    public function generatePDF($id)
-    {
-        if (!PermissionHelper::checkPermission(Constants::DOWNLOAD_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
-        }
-
-        $data = $this->invoice->show($id);
-
-        if (!$data['status']) {
-            return $this->failureResponse($data['message'], $data['data']);
-        }
-
-        $pdfData = $this->invoice->generatePDF($data['data']);
-
-        if ($pdfData['status']) {
-            return $this->successResponse(__('messages.pdf_generated'), $pdfData['data']);
-        }
-
-        return $this->failureResponse($pdfData['message'], $pdfData['data']);
-    }
-
-    public function downloadPDF($id)
-    {
-        if (!PermissionHelper::checkPermission(Constants::DOWNLOAD_INVOICE)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
-        }
-
-        $data = $this->invoice->show($id);
-
-        if (!$data['status']) {
-            return $this->failureResponse($data['message'], $data['data']);
-        }
-
-        $pdfData = $this->invoice->generatePDF($data['data']);
-
-        if (!$pdfData['status']) {
-            return $this->failureResponse($pdfData['message'], $pdfData['data']);
-        }
-
-        return response()->download(
-            storage_path('app/public/' . $pdfData['data']['file_path']),
-            $pdfData['data']['file_name']
-        );
-    }
-
-    public function dashboardStats(Request $request)
-    {
-        if (!PermissionHelper::checkPermission(Constants::VIEW_DASHBOARD)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
-        }
-
-        $data = $this->invoice->getDashboardStats();
-
-        if ($data['status']) {
-            return $this->successResponse(__('messages.dashboard_stats_fetched'), $data['data']);
-        }
-
-        return $this->failureResponse($data['message'], $data['data']);
+        $result = $this->invoiceRepository->getOverdueInvoices();
+        return response()->json($result, $result['status'] ? 200 : 500);
     }
 
     public function recentInvoices(Request $request)
     {
-        if (!PermissionHelper::checkPermission(Constants::VIEW_INVOICES)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
-        }
-
-        $limit = $request->limit ?? 10;
-        $data  = $this->invoice->getRecentInvoices($limit);
-
-        if ($data['status']) {
-            return $this->successResponse(__('messages.recent_invoices_fetched'), $data['data']);
-        }
-
-        return $this->failureResponse($data['message'], $data['data']);
+        $limit = $request->get('limit', 10);
+        $result = $this->invoiceRepository->getRecentInvoices($limit);
+        return response()->json($result, $result['status'] ? 200 : 500);
     }
 
-    public function overdueInvoices(Request $request)
+    public function downloadPDF($id)
     {
-        if (!PermissionHelper::checkPermission(Constants::VIEW_INVOICES)) {
-            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
+        $invoice = Invoice::find($id);
+        if (!$invoice) {
+            return response()->json([
+                'status'  => false,
+                'message' => __('messages.not_found'),
+            ], 404);
         }
 
-        $data = $this->invoice->getOverdueInvoices();
+        $result = $this->invoiceRepository->generatePDF($invoice);
+        return response()->json($result, $result['status'] ? 200 : 500);
+    }
 
-        if ($data['status']) {
-            return $this->successResponse(__('messages.overdue_invoices_fetched'), $data['data']);
+    public function duplicate($id)
+    {
+        $invoice = Invoice::find($id);
+        if (!$invoice) {
+            return response()->json([
+                'status'  => false,
+                'message' => __('messages.not_found'),
+            ], 404);
         }
 
-        return $this->failureResponse($data['message'], $data['data']);
+        $result = $this->invoiceRepository->duplicate($invoice);
+        return response()->json($result, $result['status'] ? 201 : 500);
+    }
+
+    public function generatePDF($id)
+    {
+        $invoice = Invoice::find($id);
+        if (!$invoice) {
+            return response()->json([
+                'status'  => false,
+                'message' => __('messages.not_found'),
+            ], 404);
+        }
+
+        $result = $this->invoiceRepository->generatePDF($invoice);
+        return response()->json($result, $result['status'] ? 200 : 500);
+    }
+
+    public function markAsPaid(Request $request, $id)
+    {
+        $invoice = Invoice::find($id);
+        if (!$invoice) {
+            return response()->json([
+                'status'  => false,
+                'message' => __('messages.not_found'),
+            ], 404);
+        }
+
+        $result = $this->invoiceRepository->markAsPaid($request, $invoice);
+        return response()->json($result, $result['status'] ? 200 : 500);
+    }
+
+    public function send($id)
+    {
+        $invoice = Invoice::find($id);
+        if (!$invoice) {
+            return response()->json([
+                'status'  => false,
+                'message' => __('messages.not_found'),
+            ], 404);
+        }
+
+        $result = $this->invoiceRepository->sendInvoice($invoice);
+        return response()->json($result, $result['status'] ? 200 : 500);
+    }
+
+    /**
+     * ✅ إضافة: الحصول على خطة الأقساط المرتبطة بالفاتورة
+     */
+    public function getInstallmentPlan($id)
+    {
+        try {
+            $invoice = Invoice::with(['installmentPlan.installments', 'client'])->find($id);
+
+            if (!$invoice) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => __('messages.not_found'),
+                ], 404);
+            }
+
+            $plan = $invoice->installmentPlan;
+
+            if (!$plan) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'لا توجد خطة أقساط لهذه الفاتورة.',
+                ], 404);
+            }
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'تم جلب خطة الأقساط بنجاح',
+                'data'    => $plan,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::error('InvoiceController getInstallmentPlan error', [
+                'invoice_id' => $id,
+                'error'      => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'status'  => false,
+                'message' => __('messages.operation_failed'),
+            ], 500);
+        }
+    }
+
+    /**
+     * ✅ إضافة: جلب عدد التنبيهات للجرس
+     */
+    public function notificationCounts()
+    {
+        try {
+            $counts = \App\Helpers\InvoiceNotificationHelper::getCounts();
+
+            return response()->json([
+                'status' => true,
+                'data' => [
+                    'unpaid'   => $counts['unpaid'],
+                    'overdue'  => $counts['overdue'],
+                    'due_soon' => $counts['due_soon'],
+                    'total'    => $counts['total'],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('InvoiceController notificationCounts error', ['error' => $e->getMessage()]);
+            return response()->json([
+                'status' => false,
+                'message' => __('messages.operation_failed'),
+            ], 500);
+        }
     }
 }

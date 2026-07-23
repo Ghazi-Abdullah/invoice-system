@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use App\Models\Invoice;
+use App\Observers\InvoiceObserver;
 use App\Repository\Admin\Invoice\InvoiceInterface;
 use App\Repository\Admin\Invoice\InvoiceRepository;
 use App\Repository\Admin\Client\ClientInterface;
@@ -31,6 +33,7 @@ use App\Services\ExportService;
 use App\Http\Kernel;
 use Illuminate\Support\Facades\Validator;
 use App\Constants\Constants;
+
 
 
 class AppServiceProvider extends ServiceProvider
@@ -65,8 +68,11 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot()
     {
+        Invoice::observe(InvoiceObserver::class);
+
         // ✅ تسجيل Rate Limiters (Login, API, Exports, Password Reset)
         Kernel::configureRateLimiting();
+
 
         // Register validation rules
         Validator::extend('valid_currency', function ($attribute, $value, $parameters, $validator) {

@@ -5,11 +5,14 @@ namespace App\Repository\Admin\Invoice;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\ActivityLog;
+use App\Models\InstallmentPlan;
+use App\Models\Installment;
 use App\Constants\Constants;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Config;
+use Carbon\Carbon;
 
 class InvoiceRepository implements InvoiceInterface
 {
@@ -23,6 +26,9 @@ class InvoiceRepository implements InvoiceInterface
 
     // ✅ قائمة الـ currencies المسموح بها
     private const ALLOWED_CURRENCIES = ['USD', 'EUR', 'GBP', 'SAR', 'AED', 'KWD'];
+
+    // ✅ أنواع تكرار الأقساط المسموح بها
+    private const ALLOWED_FREQUENCIES = ['weekly', 'monthly'];
 
     public function index($request)
     {
@@ -90,7 +96,7 @@ class InvoiceRepository implements InvoiceInterface
                 ];
             }
 
-            $invoice = Invoice::with(['client', 'items', 'createdBy', 'payments'])
+            $invoice = Invoice::with(['client', 'items', 'createdBy', 'payments', 'installmentPlan.installments'])
                 ->find((int) $id);
 
             if (!$invoice) {
@@ -156,8 +162,19 @@ class InvoiceRepository implements InvoiceInterface
             $discountAmount = max(0, (float) ($request->discount_amount ?? 0));
             $total          = $subtotal + $taxAmount - $discountAmount;
 
+            // ✅ الحصول على user_id من auth() - دائماً من auth()
+            $userId = auth()->id();
+            if (!$userId) {
+                return [
+                    'status'  => false,
+                    'message' => 'المستخدم غير مسجل الدخول',
+                    'data'    => null,
+                ];
+            }
+
             $invoice = Invoice::create([
                 'client_id'              => (int) $request->client_id,
+                'user_id'                => $userId,
                 'invoice_number'         => $invoiceNumber,
                 'invoice_date'           => $request->invoice_date,
                 'due_date'               => $request->due_date,
@@ -171,9 +188,7 @@ class InvoiceRepository implements InvoiceInterface
                 'enable_stripe_checkout' => (bool) ($request->enable_stripe_checkout ?? false),
                 'terms'                  => $request->terms,
                 'footer'                 => $request->footer,
-                'user_id'                => auth()->id(), // ✅ دائماً من auth() — لا تقبله من الـ request
-                // ✅ دائماً من auth() — لا تقبله من الـ request
-                'created_by'             => auth()->id(),
+                'created_by'             => $userId,
                 'is_active'              => true,
             ]);
 
@@ -186,7 +201,26 @@ class InvoiceRepository implements InvoiceInterface
                         'subtotal' => $itemsTotal,
                         'total'    => $itemsTotal + $taxAmount - $discountAmount,
                     ]);
+                    $total = $itemsTotal + $taxAmount - $discountAmount;
                 }
+            }
+
+            // ── ✅ إنشاء خطة الأقساط إذا كانت مفعلة ─────────────────────────
+            if ($request->has('installment_plan') && is_array($request->installment_plan)) {
+                $installmentPlanData = $request->installment_plan;
+
+                // التحقق من صحة بيانات خطة الأقساط
+                $planValidation = $this->validateInstallmentPlan($installmentPlanData, $total);
+                if (!$planValidation['valid']) {
+                    DB::rollBack();
+                    return [
+                        'status'  => false,
+                        'message' => $planValidation['message'],
+                        'data'    => null,
+                    ];
+                }
+
+                $this->createInstallmentPlan($invoice, $installmentPlanData, $total);
             }
 
             // ── Stripe Checkout ────────────────────────────────────────────
@@ -201,11 +235,11 @@ class InvoiceRepository implements InvoiceInterface
             return [
                 'status'  => true,
                 'message' => __('messages.invoice_created'),
-                'data'    => $invoice->load(['client', 'items', 'createdBy']),
+                'data'    => $invoice->load(['client', 'items', 'createdBy', 'installmentPlan.installments']),
             ];
-        } catch (\Exception $e) { // ← استخدم Throwable بدلاً من Exception
+        } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('InvoiceRepository store error', ['error' => $e->getMessage()]);
+            Log::error('InvoiceRepository store error', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
 
             return [
                 'status'  => false,
@@ -267,7 +301,6 @@ class InvoiceRepository implements InvoiceInterface
                 'terms'           => $request->terms  ?? $invoice->terms,
                 'footer'          => $request->footer ?? $invoice->footer,
                 'is_active'       => $request->has('is_active') ? (bool) $request->is_active : $invoice->is_active,
-                'user_id'         => auth()->id(),
             ]);
 
             // ── تحديث العناصر ──────────────────────────────────────────────
@@ -283,6 +316,30 @@ class InvoiceRepository implements InvoiceInterface
                 }
             }
 
+            // ── ✅ تحديث خطة الأقساط إذا تم إرسالها ─────────────────────────
+            if ($request->has('installment_plan') && is_array($request->installment_plan)) {
+                $installmentPlanData = $request->installment_plan;
+
+                // إلغاء الخطة القديمة إذا وجدت
+                $oldPlan = $invoice->installmentPlan;
+                if ($oldPlan) {
+                    $oldPlan->update(['status' => 'cancelled']);
+                    $oldPlan->installments()->update(['status' => 'cancelled']);
+                }
+
+                $planValidation = $this->validateInstallmentPlan($installmentPlanData, $invoice->total);
+                if (!$planValidation['valid']) {
+                    DB::rollBack();
+                    return [
+                        'status'  => false,
+                        'message' => $planValidation['message'],
+                        'data'    => null,
+                    ];
+                }
+
+                $this->createInstallmentPlan($invoice, $installmentPlanData, $invoice->total);
+            }
+
             ActivityLog::log('UPDATE', __('messages.invoice_updated') . ': ' . $invoice->invoice_number, $invoice, $oldValues, $invoice->fresh()->toArray());
 
             DB::commit();
@@ -290,7 +347,7 @@ class InvoiceRepository implements InvoiceInterface
             return [
                 'status'  => true,
                 'message' => __('messages.invoice_updated'),
-                'data'    => $invoice->load(['client', 'items', 'createdBy']),
+                'data'    => $invoice->load(['client', 'items', 'createdBy', 'installmentPlan.installments']),
             ];
         } catch (\Exception $e) {
             DB::rollBack();
@@ -315,6 +372,7 @@ class InvoiceRepository implements InvoiceInterface
             ActivityLog::log('DELETE', __('messages.invoice_deleted') . ': ' . $invoiceNumber, $invoice);
 
             $invoice->items()->delete();
+            $invoice->installmentPlans()->delete();
             $invoice->delete();
 
             DB::commit();
@@ -399,6 +457,18 @@ class InvoiceRepository implements InvoiceInterface
 
             $invoice->update($updateData);
 
+            // ✅ إذا كانت هناك خطة أقساط، تحديث جميع الأقساط المتبقية كمدفوعة
+            $installmentPlan = $invoice->installmentPlan;
+            if ($installmentPlan) {
+                $installmentPlan->installments()
+                    ->where('status', 'pending')
+                    ->update([
+                        'status'  => 'paid',
+                        'paid_at' => now(),
+                    ]);
+                $installmentPlan->update(['status' => 'completed']);
+            }
+
             ActivityLog::log('UPDATE', __('messages.invoice_marked_paid') . ': #' . $invoice->invoice_number, $invoice, $oldValues, $invoice->fresh()->toArray());
 
             DB::commit();
@@ -406,7 +476,7 @@ class InvoiceRepository implements InvoiceInterface
             return [
                 'status'  => true,
                 'message' => __('messages.invoice_marked_paid'),
-                'data'    => $invoice->load(['client', 'items']),
+                'data'    => $invoice->load(['client', 'items', 'installmentPlan.installments']),
             ];
         } catch (\Exception $e) {
             DB::rollBack();
@@ -430,8 +500,8 @@ class InvoiceRepository implements InvoiceInterface
             $newInvoice->status         = Constants::INVOICE_STATUS_DRAFT;
             $newInvoice->sent_at        = null;
             $newInvoice->paid_at        = null;
-            // ✅ دائماً من auth()
             $newInvoice->created_by     = auth()->id();
+            $newInvoice->user_id        = auth()->id();
             $newInvoice->save();
 
             foreach ($invoice->items as $item) {
@@ -488,7 +558,6 @@ class InvoiceRepository implements InvoiceInterface
     public function getDashboardStats()
     {
         try {
-            // ✅ جلب كل الإحصائيات في استعلام واحد بدل 6 استعلامات
             $stats = Invoice::selectRaw('
                 COUNT(*) as total_invoices,
                 SUM(total) as total_amount,
@@ -530,7 +599,6 @@ class InvoiceRepository implements InvoiceInterface
     public function getRecentInvoices($limit = 10)
     {
         try {
-            // ✅ الحد بـ 50 كحد أقصى
             $limit    = min((int) $limit, 50);
             $invoices = Invoice::with(['client'])
                 ->orderBy('created_at', 'desc')
@@ -589,7 +657,6 @@ class InvoiceRepository implements InvoiceInterface
 
     /**
      * إنشاء عناصر الفاتورة بأمان
-     * ✅ يتحقق من كل عنصر قبل الحفظ
      */
     private function createInvoiceItems(int $invoiceId, array $items): float
     {
@@ -600,14 +667,13 @@ class InvoiceRepository implements InvoiceInterface
             $unitPrice = max(0, (float) ($item['unit_price'] ?? 0));
             $taxRate   = min(100, max(0, (float) ($item['tax_rate'] ?? 0)));
 
-            // ✅ استخدم Model لحساب الـ total بشكل موحد
             $invoiceItem = InvoiceItem::create([
                 'invoice_id'  => $invoiceId,
                 'description' => substr(trim($item['description'] ?? ''), 0, 500),
                 'quantity'    => $quantity,
                 'unit_price'  => $unitPrice,
                 'tax_rate'    => $taxRate,
-                'total'       => 0, // سيتم حسابه تلقائياً في boot()
+                'total'       => 0,
                 'item_type'   => $item['item_type'] ?? 'product',
                 'notes'       => $item['notes'] ?? null,
             ]);
@@ -619,8 +685,121 @@ class InvoiceRepository implements InvoiceInterface
     }
 
     /**
+     * ✅ إضافة: التحقق من صحة بيانات خطة الأقساط
+     */
+    private function validateInstallmentPlan(array $planData, float $invoiceTotal): array
+    {
+        // التحقق من عدد الأقساط
+        $numberOfInstallments = (int) ($planData['number_of_installments'] ?? 0);
+        if ($numberOfInstallments < 2 || $numberOfInstallments > 24) {
+            return [
+                'valid'   => false,
+                'message' => 'عدد الأقساط يجب أن يكون بين 2 و 24',
+            ];
+        }
+
+        // التحقق من نسبة الفائدة
+        $interestRate = (float) ($planData['interest_rate'] ?? 0);
+        if ($interestRate < 0 || $interestRate > 100) {
+            return [
+                'valid'   => false,
+                'message' => 'نسبة الفائدة يجب أن تكون بين 0% و 100%',
+            ];
+        }
+
+        // التحقق من نوع التكرار
+        $frequency = $planData['frequency'] ?? 'monthly';
+        if (!in_array($frequency, self::ALLOWED_FREQUENCIES, true)) {
+            return [
+                'valid'   => false,
+                'message' => 'نوع التكرار يجب أن يكون weekly أو monthly',
+            ];
+        }
+
+        // التحقق من تاريخ البدء
+        $startDate = $planData['start_date'] ?? null;
+        if (!$startDate || !strtotime($startDate)) {
+            return [
+                'valid'   => false,
+                'message' => 'تاريخ بدء خطة الأقساط غير صالح',
+            ];
+        }
+
+        // التحقق من الملاحظات (اختياري)
+        $notes = $planData['notes'] ?? null;
+        if ($notes && strlen($notes) > 1000) {
+            return [
+                'valid'   => false,
+                'message' => 'ملاحظات خطة الأقساط لا يمكن أن تتجاوز 1000 حرف',
+            ];
+        }
+
+        return [
+            'valid'   => true,
+            'message' => 'بيانات خطة الأقساط صالحة',
+        ];
+    }
+
+    /**
+     * ✅ إضافة: إنشاء خطة الأقساط مع الأقساط الفرعية
+     */
+    private function createInstallmentPlan(Invoice $invoice, array $planData, float $invoiceTotal): InstallmentPlan
+    {
+        $numberOfInstallments = (int) $planData['number_of_installments'];
+        $interestRate         = (float) ($planData['interest_rate'] ?? 0);
+        $frequency            = $planData['frequency'] ?? 'monthly';
+        $startDate            = Carbon::parse($planData['start_date']);
+        $notes                = $planData['notes'] ?? null;
+
+        // حساب مبلغ الفائدة
+        $interestAmount = $invoiceTotal * ($interestRate / 100);
+        $totalAmount    = $invoiceTotal + $interestAmount;
+
+        // إنشاء خطة الأقساط
+        $installmentPlan = InstallmentPlan::create([
+            'invoice_id'             => $invoice->id,
+            'number_of_installments' => $numberOfInstallments,
+            'interest_rate'          => $interestRate,
+            'original_amount'        => $invoiceTotal,
+            'interest_amount'        => $interestAmount,
+            'total_amount'           => $totalAmount,
+            'start_date'             => $startDate->format('Y-m-d'),
+            'frequency'              => $frequency,
+            'status'                 => 'active',
+            'notes'                  => $notes,
+            'created_by'             => auth()->id(),
+        ]);
+
+        // حساب مبلغ القسط
+        $installmentAmount = round($totalAmount / $numberOfInstallments, 2);
+
+        // إنشاء الأقساط الفرعية
+        for ($i = 1; $i <= $numberOfInstallments; $i++) {
+            $dueDate = $frequency === 'monthly'
+                ? $startDate->copy()->addMonths($i - 1)
+                : $startDate->copy()->addWeeks($i - 1);
+
+            // القسط الأخير يأخذ الباقي لتجنب مشاكل التقريب
+            $amount = ($i === $numberOfInstallments)
+                ? round($totalAmount - ($installmentAmount * ($numberOfInstallments - 1)), 2)
+                : $installmentAmount;
+
+            Installment::create([
+                'installment_plan_id' => $installmentPlan->id,
+                'installment_number'  => $i,
+                'due_date'            => $dueDate->format('Y-m-d'),
+                'amount'              => $amount,
+                'status'              => 'pending',
+                'payment_id'          => null,
+                'paid_at'             => null,
+            ]);
+        }
+
+        return $installmentPlan;
+    }
+
+    /**
      * إنشاء Stripe Checkout Session
-     * ✅ يستخدم config() بدل env()
      */
     private function createStripeCheckoutSession($invoice): mixed
     {
