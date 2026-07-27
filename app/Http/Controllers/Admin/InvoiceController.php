@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Repository\Admin\Invoice\InvoiceInterface;
 use Illuminate\Http\Request;
 use App\Models\Invoice;
+use Illuminate\Support\Facades\Log;
+
 use App\Models\InstallmentPlan;
 
 class InvoiceController extends Controller
@@ -182,7 +184,7 @@ class InvoiceController extends Controller
                 'data'    => $plan,
             ], 200);
         } catch (\Exception $e) {
-            \Log::error('InvoiceController getInstallmentPlan error', [
+            Log::error('InvoiceController getInstallmentPlan error', [
                 'invoice_id' => $id,
                 'error'      => $e->getMessage(),
             ]);
@@ -212,7 +214,7 @@ class InvoiceController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
-            \Log::error('InvoiceController notificationCounts error', ['error' => $e->getMessage()]);
+            Log::error('InvoiceController notificationCounts error', ['error' => $e->getMessage()]);
             return response()->json([
                 'status' => false,
                 'message' => __('messages.operation_failed'),

@@ -146,6 +146,11 @@ class Invoice extends Model
         return $this->hasMany(InstallmentPlan::class);
     }
 
+    public function paymentLinks()
+    {
+        return $this->hasMany(PaymentLink::class)->orderBy('created_at', 'desc');
+    }
+
     // ================================================================
     // Methods
     // ================================================================
