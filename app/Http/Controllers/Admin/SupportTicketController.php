@@ -10,33 +10,25 @@ use Illuminate\Support\Facades\Validator;
 
 class SupportTicketController extends Controller
 {
-    /**
-     * Constructor — استثني store من middleware auth
-     */
     public function __construct()
     {
         $this->middleware('auth:sanctum')->except(['store']);
     }
 
-    /**
-     * عرض كل التذاكر (للأدمن)
-     */
     public function index(Request $request)
     {
-        $query = SupportTicket::with(['user', 'replies']);
+        // ✅ أضفنا withCount('replies')
+        $query = SupportTicket::with(['user', 'replies'])->withCount('replies');
 
-        // فلترة حسب الحالة
-        if ($request->has('status') && $request->status !== '') {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
-        // فلترة حسب الأولوية
-        if ($request->has('priority') && $request->priority !== '') {
+        if ($request->filled('priority')) {
             $query->where('priority', $request->priority);
         }
 
-        // بحث
-        if ($request->has('search') && $request->search !== '') {
+        if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('ticket_number', 'like', "%{$search}%")
@@ -53,23 +45,20 @@ class SupportTicketController extends Controller
             'data' => $tickets->items(),
             'meta' => [
                 'current_page' => $tickets->currentPage(),
-                'last_page' => $tickets->lastPage(),
-                'per_page' => $tickets->perPage(),
-                'total' => $tickets->total(),
+                'last_page'    => $tickets->lastPage(),
+                'per_page'     => $tickets->perPage(),
+                'total'        => $tickets->total(),
             ]
         ]);
     }
 
-    /**
-     * إنشاء تذكرة جديدة (Public — بدون تسجيل)
-     */
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255',
-            'subject' => 'required|string|max:255',
-            'message' => 'required|string',
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|max:255',
+            'subject'  => 'required|string|max:255',
+            'message'  => 'required|string',
             'priority' => 'nullable|in:low,medium,high',
         ]);
 
@@ -77,56 +66,47 @@ class SupportTicketController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'بيانات غير صحيحة',
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
         $ticket = SupportTicket::create([
             'ticket_number' => 'TKT-' . strtoupper(uniqid()),
-            'user_id' => auth('sanctum')->id(), // null if guest
-            'name' => $request->name,
-            'email' => $request->email,
-            'subject' => $request->subject,
-            'message' => $request->message,
-            'priority' => $request->priority ?? 'medium',
-            'status' => 'open',
+            'user_id'       => auth('sanctum')->id(),
+            'name'          => $request->name,
+            'email'         => $request->email,
+            'subject'       => $request->subject,
+            'message'       => $request->message,
+            'priority'      => $request->priority ?? 'medium',
+            'status'        => 'open',
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'تم إنشاء التذكرة بنجاح',
-            'ticket' => $ticket
+            'ticket'  => $ticket
         ], 201);
     }
 
-    /**
-     * عرض تفاصيل تذكرة
-     */
     public function show($id)
     {
         $ticket = SupportTicket::with(['replies.user'])->findOrFail($id);
         return response()->json($ticket);
     }
 
-    /**
-     * إضافة رد على تذكرة
-     */
     public function reply(Request $request, $id)
     {
-        $request->validate([
-            'message' => 'required|string',
-        ]);
+        $request->validate(['message' => 'required|string']);
 
         $ticket = SupportTicket::findOrFail($id);
 
         $reply = SupportTicketReply::create([
-            'ticket_id' => $id,
-            'user_id' => auth('sanctum')->id(),
-            'message' => $request->message,
+            'ticket_id'      => $id,
+            'user_id'        => auth('sanctum')->id(),
+            'message'        => $request->message,
             'is_admin_reply' => auth('sanctum')->user()?->isAdmin() ?? false,
         ]);
 
-        // تحديث الحالة إذا كانت مغلقة
         if ($ticket->status === 'closed') {
             $ticket->status = 'in_progress';
             $ticket->save();
@@ -135,15 +115,12 @@ class SupportTicketController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'تم إضافة الرد بنجاح',
-            'reply' => $reply,
+            'reply'   => $reply,
             'replies' => $ticket->replies()->with('user')->get(),
-            'status' => $ticket->status
+            'status'  => $ticket->status
         ]);
     }
 
-    /**
-     * إغلاق تذكرة
-     */
     public function close($id)
     {
         $ticket = SupportTicket::findOrFail($id);
@@ -153,13 +130,10 @@ class SupportTicketController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'تم إغلاق التذكرة',
-            'ticket' => $ticket
+            'ticket'  => $ticket
         ]);
     }
 
-    /**
-     * حذف تذكرة
-     */
     public function destroy($id)
     {
         $ticket = SupportTicket::findOrFail($id);
@@ -174,31 +148,27 @@ class SupportTicketController extends Controller
 
     public function updateStatus(Request $request, $id)
     {
-        $request->validate([
-            'status' => 'required|in:open,in_progress,closed',
-        ]);
+        $request->validate(['status' => 'required|in:open,in_progress,closed']);
 
         $ticket = SupportTicket::findOrFail($id);
         $oldStatus = $ticket->status;
         $ticket->status = $request->status;
         $ticket->save();
 
-        // إذا تم إغلاقها، أضف رد نظامي
         if ($request->status === 'closed' && $oldStatus !== 'closed') {
             SupportTicketReply::create([
-                'ticket_id' => $id,
-                'user_id' => auth('sanctum')->id(),
-                'message' => 'تم إغلاق التذكرة من قبل الإدارة.',
+                'ticket_id'      => $id,
+                'user_id'        => auth('sanctum')->id(),
+                'message'        => 'تم إغلاق التذكرة من قبل الإدارة.',
                 'is_admin_reply' => true,
             ]);
         }
 
-        // إذا فُتحت بعد الإغلاق
         if ($oldStatus === 'closed' && in_array($request->status, ['open', 'in_progress'])) {
             SupportTicketReply::create([
-                'ticket_id' => $id,
-                'user_id' => auth('sanctum')->id(),
-                'message' => 'تم إعادة فتح التذكرة.',
+                'ticket_id'      => $id,
+                'user_id'        => auth('sanctum')->id(),
+                'message'        => 'تم إعادة فتح التذكرة.',
                 'is_admin_reply' => true,
             ]);
         }
@@ -206,7 +176,7 @@ class SupportTicketController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'تم تحديث الحالة',
-            'data' => $ticket->load(['replies.user']),
+            'data'    => $ticket->load(['replies.user']),
         ]);
     }
 }
