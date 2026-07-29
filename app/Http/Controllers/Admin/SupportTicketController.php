@@ -171,4 +171,42 @@ class SupportTicketController extends Controller
             'message' => 'تم حذف التذكرة'
         ]);
     }
+
+    public function updateStatus(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|in:open,in_progress,closed',
+        ]);
+
+        $ticket = SupportTicket::findOrFail($id);
+        $oldStatus = $ticket->status;
+        $ticket->status = $request->status;
+        $ticket->save();
+
+        // إذا تم إغلاقها، أضف رد نظامي
+        if ($request->status === 'closed' && $oldStatus !== 'closed') {
+            SupportTicketReply::create([
+                'ticket_id' => $id,
+                'user_id' => auth('sanctum')->id(),
+                'message' => 'تم إغلاق التذكرة من قبل الإدارة.',
+                'is_admin_reply' => true,
+            ]);
+        }
+
+        // إذا فُتحت بعد الإغلاق
+        if ($oldStatus === 'closed' && in_array($request->status, ['open', 'in_progress'])) {
+            SupportTicketReply::create([
+                'ticket_id' => $id,
+                'user_id' => auth('sanctum')->id(),
+                'message' => 'تم إعادة فتح التذكرة.',
+                'is_admin_reply' => true,
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'تم تحديث الحالة',
+            'data' => $ticket->load(['replies.user']),
+        ]);
+    }
 }
