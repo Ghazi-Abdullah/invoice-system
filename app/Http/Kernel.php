@@ -16,11 +16,7 @@ class Kernel extends HttpKernel
         \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
-
-        // ✅ تضاف على كل طلب - Security Headers
         \App\Http\Middleware\SecurityHeadersMiddleware::class,
-
-        // ✅ تنظيف المدخلات من XSS
         \App\Http\Middleware\SanitizeInputMiddleware::class,
     ];
 
@@ -34,7 +30,6 @@ class Kernel extends HttpKernel
 
         'api' => [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-            // ✅ Rate Limit عام على كل الـ API
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
@@ -51,23 +46,12 @@ class Kernel extends HttpKernel
         'signed'           => \Illuminate\Routing\Middleware\ValidateSignature::class,
         'throttle'         => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified'         => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
-
-        // ✅ Middlewares الخاصة بالمشروع
         'check.sanctum'    => \App\Http\Middleware\CheckSanctumToken::class,
         'permission'       => \App\Http\Middleware\CheckPermission::class,
-
-        // ✅ Rate Limits المخصصة
-        'throttle.login'   => 'throttle:login',
-        'throttle.exports' => 'throttle:exports',
     ];
 
-    /**
-     * تعريف جميع Rate Limiters للمشروع
-     * يُستدعى من AppServiceProvider أو هنا عبر boot
-     */
     public static function configureRateLimiting(): void
     {
-        // ── 1. API العام: 60 طلب/دقيقة لكل مستخدم ─────────────────────────
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)
                 ->by($request->user()?->id ?: $request->ip())
@@ -80,8 +64,6 @@ class Kernel extends HttpKernel
                 });
         });
 
-        // ── 2. تسجيل الدخول: 5 محاولات/دقيقة لكل IP ─────────────────────
-        // يمنع Brute Force على كلمات المرور
         RateLimiter::for('login', function (Request $request) {
             return Limit::perMinute(5)
                 ->by($request->ip())
@@ -94,8 +76,6 @@ class Kernel extends HttpKernel
                 });
         });
 
-        // ── 3. Exports: 10 طلبات/5 دقائق لكل مستخدم ──────────────────────
-        // يمنع توليد ملفات Excel بكميات كبيرة تضغط على السيرفر
         RateLimiter::for('exports', function (Request $request) {
             return Limit::perMinutes(5, 10)
                 ->by($request->user()?->id ?: $request->ip())
@@ -108,7 +88,6 @@ class Kernel extends HttpKernel
                 });
         });
 
-        // ── 4. Password Reset: 3 طلبات/15 دقيقة لكل IP ───────────────────
         RateLimiter::for('password-reset', function (Request $request) {
             return Limit::perMinutes(15, 3)
                 ->by($request->ip())
@@ -120,5 +99,23 @@ class Kernel extends HttpKernel
                     ], 429);
                 });
         });
+
+        RateLimiter::for('otp', function (Request $request) {
+            return Limit::perMinutes(5, 3)
+                ->by($request->ip())
+                ->response(function () {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'لا يمكن طلب رمز التحقق أكثر من 3 مرات كل 5 دقائق.',
+                        'retry_after' => 300,
+                    ], 429);
+                });
+        });
+    }
+
+    public function boot(): void
+    {
+        parent::boot();
+        self::configureRateLimiting();
     }
 }

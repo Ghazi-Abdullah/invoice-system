@@ -11,6 +11,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             PermissionSystemSeeder::class,
             InstallmentInterestTierSeeder::class,
+            ContentPagesSeeder::class,
+            //InstallmentPlansSeeder::class,
         ]);
     }
 }

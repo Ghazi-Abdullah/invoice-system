@@ -6,10 +6,11 @@ use App\Constants\Constants;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Installment extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'installment_plan_id',
@@ -68,9 +69,9 @@ class Installment extends Model
     }
 
     /**
-     * تسجيل القسط كمدفوع + إنشاء سجل Payment مرتبط به (بدون تعليم الفاتورة
-     * كاملة كمدفوعة — هذا مسؤولية InstallmentPlanRepository بعد التأكد من
-     * سداد جميع الأقساط).
+     * ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ù‚Ø³Ø· ÙƒÙ…Ø¯ÙÙˆØ¹ + Ø¥Ù†Ø´Ø§Ø¡ Ø³Ø¬Ù„ Payment Ù…Ø±ØªØ¨Ø· Ø¨Ù‡ (Ø¨Ø¯ÙˆÙ† ØªØ¹Ù„ÙŠÙ… Ø§Ù„ÙØ§ØªÙˆØ±Ø©
+     * ÙƒØ§Ù…Ù„Ø© ÙƒÙ…Ø¯ÙÙˆØ¹Ø© â€” Ù‡Ø°Ø§ Ù…Ø³Ø¤ÙˆÙ„ÙŠØ© InstallmentPlanRepository Ø¨Ø¹Ø¯ Ø§Ù„ØªØ£ÙƒØ¯ Ù…Ù†
+     * Ø³Ø¯Ø§Ø¯ Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø£Ù‚Ø³Ø§Ø·).
      */
     public function markAsPaid(string $paymentMethod = 'cash'): Payment
     {
@@ -95,3 +96,4 @@ class Installment extends Model
         return $payment;
     }
 }
+

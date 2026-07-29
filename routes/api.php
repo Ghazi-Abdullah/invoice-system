@@ -4,11 +4,10 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\ActivityLogController;
-
 use App\Http\Controllers\Admin\PaymentController;
-
-// ✅ Webhook Stripe - لا يحتاج middleware
-Route::post('/stripe/webhook', [PaymentController::class, 'handleWebhook'])->name('stripe.webhook');
+use App\Http\Controllers\Admin\PaymentLinkController;
+use App\Http\Controllers\Admin\SupportTicketController;
+use App\Http\Controllers\Admin\OtpLogController;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,48 +15,53 @@ Route::post('/stripe/webhook', [PaymentController::class, 'handleWebhook'])->nam
 |--------------------------------------------------------------------------
 */
 
-// ============================================================
-// Public Routes (بدون مصادقة)
-// ============================================================
-Route::prefix('admin')->group(function () {
+// ═══════════════════════════════════════════════════════════════
+// ║  مسارات Webhook (Public)                                   ║
+// ═══════════════════════════════════════════════════════════════
+Route::post('/stripe/webhook', [PaymentController::class, 'handleWebhook'])
+    ->name('stripe.webhook');
 
-    // ✅ Login: 5 محاولات فقط/دقيقة لكل IP (حماية Brute Force)
-    Route::post('login', [AuthController::class, 'login'])
-        ->middleware('throttle:login');
-
-    // ✅ Forgot Password: 3 طلبات/15 دقيقة
-    Route::post('forgot-password', [AuthController::class, 'forgotPassword'])
-        ->middleware('throttle:password-reset');
-
-    // ✅ Reset Password: 3 طلبات/15 دقيقة
-    Route::post('reset-password', [AuthController::class, 'resetPassword'])
-        ->middleware('throttle:password-reset');
-    // ✅ send-otp: 5 محاولات/دقيقة
-    Route::post('send-otp', [AuthController::class, 'sendOtp'])
-        ->middleware('throttle:login');
-
-    // ✅ verify-otp: 5 محاولات/دقيقة
-    Route::post('verify-otp', [AuthController::class, 'verifyOtp'])
-        ->middleware('throttle:login');
-});
-
-// ============================================================
-// Stripe Webhook - بدون auth لكن بتحقق من التوقيع داخل Controller
-// ✅ بدون SanitizeInput (يحتاج raw body)
-// ✅ بدون throttle (Stripe يرسل من IPs محددة)
-// ============================================================
 Route::post(
     'admin/payments/webhook',
-    [\App\Http\Controllers\Admin\PaymentController::class, 'handleWebhook']
+    [PaymentController::class, 'handleWebhook']
 )->withoutMiddleware([
     \App\Http\Middleware\SanitizeInputMiddleware::class,
     \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
 ]);
 
-// ============================================================
-// Protected Routes (تحتاج auth:sanctum)
-// ✅ throttle:api = 60 طلب/دقيقة لكل مستخدم
-// ============================================================
+// ═══════════════════════════════════════════════════════════════
+// ║  مسارات عامة (Public) — لا تتطلب تسجيل دخول              ║
+// ═══════════════════════════════════════════════════════════════
+
+// إنشاء تذكرة دعم من صفحة "اتصل بنا" (Public)
+Route::post('/support/tickets', [SupportTicketController::class, 'store']);
+
+// التحقق من روابط الدفع
+Route::get("/payment-links/{token}/validate", [PaymentLinkController::class, "validateLink"]);
+
+// ═══════════════════════════════════════════════════════════════
+// ║  Auth (Public) — بدون sanctum                              ║
+// ═══════════════════════════════════════════════════════════════
+Route::prefix('admin')->group(function () {
+    Route::post('login', [AuthController::class, 'login'])
+        ->middleware('throttle:login');
+
+    Route::post('forgot-password', [AuthController::class, 'forgotPassword'])
+        ->middleware('throttle:password-reset');
+
+    Route::post('reset-password', [AuthController::class, 'resetPassword'])
+        ->middleware('throttle:password-reset');
+
+    Route::post('send-otp', [AuthController::class, 'sendOtp'])
+        ->middleware('throttle:otp');
+
+    Route::post('verify-otp', [AuthController::class, 'verifyOtp'])
+        ->middleware('throttle:login');
+});
+
+// ═══════════════════════════════════════════════════════════════
+// ║  المجموعة الرئيسية: كل شيء تحت /api/admin/ + auth:sanctum   ║
+// ═══════════════════════════════════════════════════════════════
 Route::prefix('admin')->middleware(['auth:sanctum', 'throttle:api'])->group(function () {
 
     // ── Auth ────────────────────────────────────────────────
@@ -70,13 +74,11 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'throttle:api'])->group(func
     Route::put('/profile',          [UserController::class, 'updateProfile']);
     Route::post('/change-password', [UserController::class, 'changePassword']);
 
-    // ── Activity Logs ────────────────────────────────────────
+    // ── Logs ────────────────────────────────────────────────
     Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+    Route::get('/otp-logs',      [OtpLogController::class, 'index']);
 
-    // ── OTP Logs ─────────────────────────────────────────────
-    Route::get('/otp-logs', [\App\Http\Controllers\Admin\OtpLogController::class, 'index']);
-
-    // ── Admin Routes ─────────────────────────────────────────
+    // ── Includes ────────────────────────────────────────────
     require __DIR__ . '/admin/clients.php';
     require __DIR__ . '/admin/invoices.php';
     require __DIR__ . '/admin/installments.php';
@@ -85,7 +87,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'throttle:api'])->group(func
     require __DIR__ . '/admin/permissions.php';
     require __DIR__ . '/admin/admin-groups.php';
     require __DIR__ . '/admin/payments.php';
-
-    // ── Reports: throttle مخصص للـ Exports ──────────────────
     require __DIR__ . '/admin/reports.php';
+    require __DIR__ . '/admin/payment-links.php';
+    require __DIR__ . '/admin/support.php';
 });
