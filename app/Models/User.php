@@ -30,13 +30,18 @@ class User extends Authenticatable
         'otp_created_at',
         'otp_attempts',
         'otp_verified_at',
-        'last_login_ip', // ✅ أضفناه
+        'last_login_ip',
+        'last_login_at',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
-        'otp', // ✅ مخفي دايماً في الـ response
+        'otp',
+        'otp_via',
+        'otp_created_at',
+        'otp_attempts',
+        'otp_verified_at',
     ];
 
     protected $casts = [
@@ -44,6 +49,7 @@ class User extends Authenticatable
         'is_active'         => 'boolean',
         'otp_created_at'    => 'datetime',
         'otp_verified_at'   => 'datetime',
+        'last_login_at'     => 'datetime',
     ];
 
     protected $appends = ['img_url'];
@@ -119,8 +125,11 @@ class User extends Authenticatable
 
         return $adminGroup->permissions()
             ->where('title', $permission)
+            ->where('is_active', true)
             ->exists();
     }
 
-    // ✅ حذفنا can() — لا تعيد تعريفها، تكسر Laravel Policies
+    /**
+     * ✅ حذفنا can() — لا تعيد تعريفها، تكسر Laravel Policies
+     */
 }

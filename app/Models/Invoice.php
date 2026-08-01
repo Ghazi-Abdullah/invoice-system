@@ -16,7 +16,7 @@ class Invoice extends Model
         'invoice_number',
         'invoice_date',
         'due_date',
-        'payment_date',   // ✅ إضافة: كان مفقوداً — markAsPaid يرسله ولم يُحفظ
+        'payment_date',
         'status',
         'subtotal',
         'tax_amount',
@@ -31,7 +31,6 @@ class Invoice extends Model
         'paid_at',
         'created_by',
         'is_active',
-        'user_id', // ✅ إضافة: user_id — دائماً من auth()، لا تقبله من الـ request
     ];
 
     protected $hidden = [
@@ -41,7 +40,7 @@ class Invoice extends Model
     protected $casts = [
         'invoice_date'           => 'date',
         'due_date'               => 'date',
-        'payment_date'           => 'date',       // ✅ إضافة: cast صحيح
+        'payment_date'           => 'date',
         'sent_at'                => 'datetime',
         'paid_at'                => 'datetime',
         'subtotal'               => 'decimal:2',
@@ -137,6 +136,21 @@ class Invoice extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function installmentPlan()
+    {
+        return $this->hasOne(InstallmentPlan::class)->where('status', 'active');
+    }
+
+    public function installmentPlans()
+    {
+        return $this->hasMany(InstallmentPlan::class);
+    }
+
+    public function paymentLinks()
+    {
+        return $this->hasMany(PaymentLink::class)->orderBy('created_at', 'desc');
+    }
+
     // ================================================================
     // Methods
     // ================================================================
@@ -188,11 +202,6 @@ class Invoice extends Model
             && $this->total > 0;
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | ✅ إضافة: isPaid() — دالة مساعدة تُستخدم في Controller و Repository
-    |--------------------------------------------------------------------------
-    */
     public function isPaid(): bool
     {
         return $this->status === Constants::INVOICE_STATUS_PAID;

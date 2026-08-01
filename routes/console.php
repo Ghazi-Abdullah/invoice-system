@@ -8,3 +8,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Illuminate\Support\Facades\Schedule::command('installments:mark-overdue')->dailyAt('00:05');
+Illuminate\Support\Facades\Schedule::command('invoices:check-due-dates')->dailyAt('08:00');

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\Authenticate;
+use App\Http\Middleware\CheckIdleTimeout;
 use App\Http\Middleware\CheckPermission;
 use App\Http\Middleware\CheckSanctumToken;
 use App\Http\Middleware\SanitizeInputMiddleware;
@@ -30,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth' => Authenticate::class,
             'permission' => CheckPermission::class,
             'check.sanctum' => CheckSanctumToken::class,
+            'check.idle' => CheckIdleTimeout::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
