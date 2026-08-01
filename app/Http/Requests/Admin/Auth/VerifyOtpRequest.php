@@ -19,20 +19,28 @@ class VerifyOtpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'user_id' => 'required|integer|exists:users,id',
-            'otp'     => 'required|string|size:6',
-            // ✅ string بدل digits — لأن OTP بعد الـ hash مش أرقام فقط
+            'email' => 'required|email|max:255',
+            'otp'   => 'required|string|size:6',
         ];
     }
 
     public function messages(): array
     {
         return [
-            'user_id.required' => 'معرف المستخدم مطلوب',
-            'user_id.exists'   => 'المستخدم غير موجود',
-            'otp.required'     => 'رمز التحقق مطلوب',
-            'otp.size'         => 'رمز التحقق يجب أن يكون 6 خانات',
+            'email.required' => 'البريد الإلكتروني مطلوب',
+            'email.email'    => 'البريد الإلكتروني غير صحيح',
+            'otp.required'   => 'رمز التحقق مطلوب',
+            'otp.size'       => 'رمز التحقق يجب أن يكون 6 خانات',
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('email')) {
+            $this->merge([
+                'email' => strtolower(trim($this->email)),
+            ]);
+        }
     }
 
     protected function failedValidation(Validator $validator)

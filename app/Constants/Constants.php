@@ -39,7 +39,7 @@ class Constants
     const MANAGE_USER_GROUPS = 'manage_user_groups';
     const VIEW_PERMISSIONS = 'view_permissions';
     const RESPONSE_TOO_MANY_REQUESTS = 429;
-    
+
     // Pagination
     const DEFAULT_PER_PAGE = 10;
     const MAX_PER_PAGE = 100;
@@ -146,6 +146,12 @@ class Constants
     const CREATE_PAYMENT = 'create_payment';
     const VIEW_PAYMENTS = 'view_payments';
     const REFUND_PAYMENT = 'refund_payment';
+    const VIEW_OTP_LOGS = 'view_otp_logs';
+    const VIEW_SUPPORT_TICKETS = 'view_support_tickets';
+    const REPLY_SUPPORT_TICKET = 'reply_support_ticket';
+    const EDIT_SUPPORT_TICKET_STATUS = 'edit_support_ticket_status';
+    const DELETE_SUPPORT_TICKET = 'delete_support_ticket';
+    const REFUND_PAYMENTS = 'refund_payments';
 
     // Response Messages (أضف في قسم messages)
     const MESSAGE_PAYMENT_SESSION_CREATED = 'payment_session_created';

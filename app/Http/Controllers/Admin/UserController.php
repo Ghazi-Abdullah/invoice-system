@@ -167,33 +167,22 @@ class UserController extends Controller
     public function updateStatus(Request $request, $id)
     {
         if (!PermissionHelper::checkPermission(Constants::EDIT_USER)) {
-            return $this->failureResponse(
-                __('messages.no_permission'),
-                null,
-                Constants::RESPONSE_FORBIDDEN
-            );
+            return $this->failureResponse(__('messages.no_permission'), null, Constants::RESPONSE_FORBIDDEN);
         }
 
-        $request->validate([
-            'is_active' => 'required|boolean'
-        ]);
-
-        $data = $this->user->show($id);
-
-        if (!$data['status']) {
-            return $this->failureResponse($data['message'], $data['data']);
+        $user = User::find($id);
+        if (!$user) {
+            return $this->failureResponse(__('messages.user_not_found'), null, Constants::RESPONSE_NOT_FOUND);
         }
 
-        $statusData = $this->user->updateStatus($data['data'], $request->is_active);
+        $user->update(['is_active' => $request->boolean('is_active')]);
 
-        if ($statusData['status']) {
-            return $this->successResponse(
-                __('messages.user_status_updated'),
-                $statusData['data']
-            );
+        // ✅ إبطال فوري لكل التوكنات عند التعطيل — لا ينتظر الفحص عند أول طلب لاحق
+        if (!$user->is_active) {
+            $user->tokens()->delete();
         }
 
-        return $this->failureResponse($statusData['message'], $statusData['data']);
+        return $this->successResponse(__('messages.status_updated'), $user);
     }
 
     /**

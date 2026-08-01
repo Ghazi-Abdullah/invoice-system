@@ -27,7 +27,9 @@ class PermissionSystemSeeder extends Seeder
         // Re-enable foreign key checks
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
+        // ═══════════════════════════════════════════════════════════════
         // 1. Insert admin groups
+        // ═══════════════════════════════════════════════════════════════
         $groups = [
             [
                 'id'          => 1,
@@ -83,7 +85,9 @@ class PermissionSystemSeeder extends Seeder
 
         DB::table('admin_groups')->insert($groups);
 
+        // ═══════════════════════════════════════════════════════════════
         // 2. Insert users
+        // ═══════════════════════════════════════════════════════════════
         $users = [
             [
                 'name'           => 'Super Admin',
@@ -122,7 +126,9 @@ class PermissionSystemSeeder extends Seeder
 
         DB::table('users')->insert($users);
 
+        // ═══════════════════════════════════════════════════════════════
         // 3. Insert main menus
+        // ═══════════════════════════════════════════════════════════════
         $menus = [
             [
                 'id'          => 1,
@@ -179,12 +185,25 @@ class PermissionSystemSeeder extends Seeder
                 'created_at'  => now(),
                 'updated_at'  => now(),
             ],
+            // ✅ منيو جديد: تذاكر الدعم الفني
+            [
+                'id'          => 6,
+                'title_en'    => 'Support Tickets',
+                'title_ar'    => 'تذاكر الدعم',
+                'link'        => '/support/tickets',
+                'icon_class'  => 'fa-headset',
+                'sort_order'  => 6,
+                'is_active'   => true,
+                'created_at'  => now(),
+                'updated_at'  => now(),
+            ],
         ];
 
         DB::table('admin_menus')->insert($menus);
 
-        // 4. Insert permissions with the new columns (admin_menu_id, admin_sub_menu_id, parent_id, is_parent)
-        // Note: admin_sub_menu_id is set to null for simplicity; you can adjust if you have sub-menus.
+        // ═══════════════════════════════════════════════════════════════
+        // 4. Insert permissions
+        // ═══════════════════════════════════════════════════════════════
         $permissions = [
             // Dashboard
             [
@@ -384,6 +403,80 @@ class PermissionSystemSeeder extends Seeder
                 'parent_id'         => null,
                 'is_parent'         => false,
             ],
+
+            // ═══════════════════════════════════════════════════════════════
+            // ✅ صلاحيات تذاكر الدعم الفني (جديدة)
+            // ═══════════════════════════════════════════════════════════════
+            [
+                'id'                => 20,
+                'title'             => 'view_support_tickets',
+                'description_en'    => 'View Support Tickets',
+                'description_ar'    => 'عرض تذاكر الدعم',
+                'admin_menu_id'     => 6,
+                'admin_sub_menu_id' => null,
+                'parent_id'         => null,
+                'is_parent'         => false,
+            ],
+            [
+                'id'                => 21,
+                'title'             => 'create_support_ticket',
+                'description_en'    => 'Create Support Ticket',
+                'description_ar'    => 'إنشاء تذكرة دعم',
+                'admin_menu_id'     => 6,
+                'admin_sub_menu_id' => null,
+                'parent_id'         => null,
+                'is_parent'         => false,
+            ],
+            [
+                'id'                => 22,
+                'title'             => 'reply_support_ticket',
+                'description_en'    => 'Reply to Support Ticket',
+                'description_ar'    => 'الرد على تذكرة الدعم',
+                'admin_menu_id'     => 6,
+                'admin_sub_menu_id' => null,
+                'parent_id'         => null,
+                'is_parent'         => false,
+            ],
+            [
+                'id'                => 23,
+                'title'             => 'edit_support_ticket_status',
+                'description_en'    => 'Edit Support Ticket Status',
+                'description_ar'    => 'تعديل حالة تذكرة الدعم',
+                'admin_menu_id'     => 6,
+                'admin_sub_menu_id' => null,
+                'parent_id'         => null,
+                'is_parent'         => false,
+            ],
+            [
+                'id'                => 24,
+                'title'             => 'delete_support_ticket',
+                'description_en'    => 'Delete Support Ticket',
+                'description_ar'    => 'حذف تذكرة الدعم',
+                'admin_menu_id'     => 6,
+                'admin_sub_menu_id' => null,
+                'parent_id'         => null,
+                'is_parent'         => false,
+            ],
+            [
+                'id' => 25,
+                'title' => 'view_otp_logs',
+                'description_en' => 'View OTP Logs',
+                'description_ar' => 'عرض سجلات OTP',
+                'admin_menu_id' => 5,
+                'admin_sub_menu_id' => null,
+                'parent_id' => null,
+                'is_parent' => false,
+            ],
+            [
+                'id' => 26,
+                'title' => 'refund_payments',
+                'description_en' => 'Refund Payments',
+                'description_ar' => 'استرجاع المدفوعات',
+                'admin_menu_id' => 5,
+                'admin_sub_menu_id' => null,
+                'parent_id' => null,
+                'is_parent' => false,
+            ],
         ];
 
         foreach ($permissions as $permission) {
@@ -394,7 +487,11 @@ class PermissionSystemSeeder extends Seeder
             ]));
         }
 
-        // 5. Assign all permissions to Super Admin (group id 1)
+        // ═══════════════════════════════════════════════════════════════
+        // 5. Assign permissions to groups
+        // ═══════════════════════════════════════════════════════════════
+
+        // Super Admin (id: 1) → كل الصلاحيات
         foreach ($permissions as $permission) {
             DB::table('admin_group_permissions')->insert([
                 'admin_group_id'       => 1,
@@ -404,8 +501,38 @@ class PermissionSystemSeeder extends Seeder
             ]);
         }
 
-        // 6. Assign permissions to Accountant (group id 3)
-        $accountantPermissionIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 16, 17, 19];
+        // Admin (id: 2) → كل شيء ما عدا إدارة الصلاحيات (manage_permissions) ومجموعات الإدارة
+        $adminExcluded = [15, 18]; // manage_admin_groups, manage_permissions
+        foreach ($permissions as $permission) {
+            if (!in_array($permission['id'], $adminExcluded)) {
+                DB::table('admin_group_permissions')->insert([
+                    'admin_group_id'       => 2,
+                    'admin_permission_id'  => $permission['id'],
+                    'created_at'           => now(),
+                    'updated_at'           => now(),
+                ]);
+            }
+        }
+
+        // Accountant (id: 3)
+        $accountantPermissionIds = [
+            1,   // view_dashboard
+            2,
+            3,
+            4,
+            5,   // invoices
+            6,
+            7,
+            8,
+            9,   // clients
+            16,
+            17,       // reports
+            19,           // installments
+            20,
+            21,
+            22,
+            23, // ✅ support tickets (عرض + إنشاء + رد + تعديل حالة)
+        ];
         foreach ($accountantPermissionIds as $permissionId) {
             DB::table('admin_group_permissions')->insert([
                 'admin_group_id'       => 3,
@@ -415,8 +542,19 @@ class PermissionSystemSeeder extends Seeder
             ]);
         }
 
-        // 7. Assign permissions to Sales (group id 4)
-        $salesPermissionIds = [1, 2, 3, 6, 7, 8, 9];
+        // Sales (id: 4)
+        $salesPermissionIds = [
+            1,   // view_dashboard
+            2,
+            3, // invoices (view + create)
+            6,
+            7,
+            8,
+            9, // clients
+            20,
+            21,
+            22, // ✅ support tickets (عرض + إنشاء + رد)
+        ];
         foreach ($salesPermissionIds as $permissionId) {
             DB::table('admin_group_permissions')->insert([
                 'admin_group_id'       => 4,
