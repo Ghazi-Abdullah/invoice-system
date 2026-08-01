@@ -32,9 +32,8 @@ use App\Repository\Admin\InstallmentInterestTier\InstallmentInterestTierReposito
 use App\Services\ExportService;
 use App\Http\Kernel;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\URL;
 use App\Constants\Constants;
-
-
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -71,8 +70,18 @@ class AppServiceProvider extends ServiceProvider
         Invoice::observe(InvoiceObserver::class);
 
         // ✅ تسجيل Rate Limiters (Login, API, Exports, Password Reset)
+        // ملاحظة: هذا الاستدعاء يبقى صحيحاً رغم أن Kernel.php لم يعد
+        // الـ HTTP Kernel الفعلي في Laravel 11 — لأنه استدعاء ثابت
+        // (static method call) مستقل تماماً عن دورة حياة الـ Kernel،
+        // وليس تسجيل middleware يعتمد على تحميل الملف كـ Kernel حقيقي.
         Kernel::configureRateLimiting();
 
+        // ✅ فرض HTTPS في بيئة الإنتاج — بدون هذا، أي رابط مولّد
+        // بواسطة url()/route() قد يُبنى بـ http:// خلف load balancer
+        // أو proxy، ويُعتبر ثغرة إفصاح بروتوكول غير آمن.
+        if ($this->app->environment('production')) {
+            URL::forceScheme('https');
+        }
 
         // Register validation rules
         Validator::extend('valid_currency', function ($attribute, $value, $parameters, $validator) {

@@ -5,6 +5,8 @@ namespace App\Helpers;
 use App\Models\User;
 use App\Models\AdminPermission;
 use App\Constants\Constants;
+use Illuminate\Support\Facades\Auth;
+
 
 class PermissionHelper
 {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\Authenticate;
 use App\Http\Middleware\CheckIdleTimeout;
 use App\Http\Middleware\CheckPermission;
@@ -12,10 +13,10 @@ use Illuminate\Foundation\Configuration\Middleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
-        api: __DIR__.'/../routes/api.php',
-        commands: __DIR__.'/../routes/console.php',
-        // health: '/up',
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        commands: __DIR__ . '/../routes/console.php',
+        health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
         // ── تطبّق على كل طلب (كانت معرّفة في app/Http/Kernel.php
@@ -28,10 +29,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             // بدون هذا، Laravel يستخدم نسخته الافتراضية من Authenticate
             // (اللي تحاول route('login') غير الموجود) بدل نسختنا المخصصة
-            'auth' => Authenticate::class,
-            'permission' => CheckPermission::class,
+            'auth'          => Authenticate::class,
+            'permission'    => CheckPermission::class,
             'check.sanctum' => CheckSanctumToken::class,
-            'check.idle' => CheckIdleTimeout::class,
+            'check.idle'    => CheckIdleTimeout::class,
+            // ✅ جديد — كان مفقوداً بالكامل من هذا الملف
+            'admin'         => AdminMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

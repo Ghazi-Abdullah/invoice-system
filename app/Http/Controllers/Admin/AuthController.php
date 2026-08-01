@@ -75,23 +75,20 @@ class AuthController extends Controller
 
             $this->clearFailedAttempts($ip, $email);
 
-            $token = $user->createToken('invoice-system-token-' . Str::random(8))->plainTextToken;
-            $permissions = $this->getUserPermissions($user);
-            $is_admin = $user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID;
+            // ✅ خطوة تحقق ثانية إلزامية: لا يُصدر أي توكن هنا.
+            // بدل ذلك يُرسل رمز OTP، والتوكن يُصدر فقط من verifyOtp()
+            // بعد تأكيد امتلاك المستخدم لصندوق بريده الفعلي.
+            $otpError = $this->attemptSendOtp($user, $request);
 
-            $user->update([
-                'last_login_ip' => $ip,
-                'last_login_at' => now(),
-            ]);
+            if ($otpError) {
+                return $this->failureResponse($otpError, null, Constants::RESPONSE_TOO_MANY_REQUESTS);
+            }
 
             return $this->successResponse(
-                __('messages.login_success'),
+                'تم التحقق من بيانات الدخول، تم إرسال رمز التحقق إلى بريدك الإلكتروني',
                 [
-                    'user'        => $this->formatUser($user, $is_admin),
-                    'token'       => $token,
-                    'token_type'  => 'Bearer',
-                    'permissions' => $permissions,
-                    'is_admin'    => $is_admin,
+                    'requires_otp' => true,
+                    'email'        => $user->email,
                 ]
             );
         } catch (\Exception $e) {
@@ -305,6 +302,7 @@ class AuthController extends Controller
             $email = strtolower(trim($request->email));
             $user = User::where('email', $email)->first();
 
+            // ✅ رسالة موحّدة سواء الحساب موجود أو لا — يمنع Enumeration
             if (!$user || !$user->is_active) {
                 return $this->successResponse(
                     'إذا كان البريد الإلكتروني مسجلاً، سيصلك رمز التحقق',
@@ -312,34 +310,13 @@ class AuthController extends Controller
                 );
             }
 
-            if ($user->otp_created_at && abs($user->otp_created_at->diffInSeconds(now())) < self::OTP_COOLDOWN_SECONDS) {
-                $remaining = self::OTP_COOLDOWN_SECONDS - abs($user->otp_created_at->diffInSeconds(now()));
-                $minutes = ceil($remaining / 60);
-                return $this->failureResponse(
-                    "تم إرسال رمز مسبقاً، حاول بعد {$minutes} دقيقة",
-                    null,
-                    Constants::RESPONSE_TOO_MANY_REQUESTS
-                );
+            // ✅ يُستخدم الآن كـ "إعادة إرسال الرمز" فقط — الإرسال الأساسي
+            // يحصل تلقائياً من داخل login() كخطوة تحقق ثانية إلزامية
+            $otpError = $this->attemptSendOtp($user, $request);
+
+            if ($otpError) {
+                return $this->failureResponse($otpError, null, Constants::RESPONSE_TOO_MANY_REQUESTS);
             }
-
-            $plainOtp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-            $user->update([
-                'otp'            => Hash::make($plainOtp),
-                'otp_via'        => 'email',
-                'otp_created_at' => now(),
-                'otp_attempts'   => 0,
-            ]);
-
-            OtpLog::create([
-                'user_id'    => $user->id,
-                'email'      => $user->email,
-                'status'     => 'sent',
-                'ip_address' => $request->ip(),
-                'expires_at' => now()->addMinutes(self::OTP_EXPIRY_MINUTES),
-            ]);
-
-            Mail::to($user->email)->send(new OtpMail($plainOtp));
 
             return $this->successResponse(
                 'إذا كان البريد الإلكتروني مسجلاً، سيصلك رمز التحقق',
@@ -358,11 +335,14 @@ class AuthController extends Controller
     public function verifyOtp(VerifyOtpRequest $request): JsonResponse
     {
         try {
-            $user = User::with(['adminGroup.permissions'])->find($request->user_id);
+            // ✅ التحقق بالبريد الإلكتروني بدل user_id (كان يُرسَل من
+            // الفرونت مباشرة بدون داعٍ — الباك الآن يبحث عن المستخدم بنفسه)
+            $email = strtolower(trim($request->email));
+            $user = User::with(['adminGroup.permissions'])->where('email', $email)->first();
 
             if (!$user) {
                 return $this->failureResponse(
-                    __('messages.invalid_credentials'),
+                    'رمز التحقق غير صحيح',
                     null,
                     Constants::RESPONSE_UNAUTHORIZED
                 );
@@ -408,6 +388,7 @@ class AuthController extends Controller
                 );
             }
 
+            // ✅ هذه هي اللحظة الوحيدة التي يُصدر فيها توكن الدخول فعلياً
             $user->update([
                 'otp'             => null,
                 'otp_via'         => null,
@@ -448,6 +429,41 @@ class AuthController extends Controller
                 Constants::RESPONSE_SERVER_ERROR
             );
         }
+    }
+
+    /**
+     * ✅ منطق إنشاء وإرسال OTP، مستخرَج بدالة واحدة مشتركة بين
+     * login() و sendOtp() لمنع ازدواجية الكود وتضارب السلوك بينهما.
+     * يرجع null عند النجاح، أو رسالة خطأ نصية لو ما زال الـ cooldown نشطاً.
+     */
+    private function attemptSendOtp(User $user, Request $request): ?string
+    {
+        if ($user->otp_created_at && abs($user->otp_created_at->diffInSeconds(now())) < self::OTP_COOLDOWN_SECONDS) {
+            $remaining = self::OTP_COOLDOWN_SECONDS - abs($user->otp_created_at->diffInSeconds(now()));
+            $minutes = ceil($remaining / 60);
+            return "تم إرسال رمز مسبقاً، حاول بعد {$minutes} دقيقة";
+        }
+
+        $plainOtp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        $user->update([
+            'otp'            => Hash::make($plainOtp),
+            'otp_via'        => 'email',
+            'otp_created_at' => now(),
+            'otp_attempts'   => 0,
+        ]);
+
+        OtpLog::create([
+            'user_id'    => $user->id,
+            'email'      => $user->email,
+            'status'     => 'sent',
+            'ip_address' => $request->ip(),
+            'expires_at' => now()->addMinutes(self::OTP_EXPIRY_MINUTES),
+        ]);
+
+        Mail::to($user->email)->send(new OtpMail($plainOtp));
+
+        return null;
     }
 
     private function incrementFailedAttempts(string $ip, string $email): void

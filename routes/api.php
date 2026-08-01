@@ -59,10 +59,14 @@ Route::prefix('admin')->group(function () {
         ->middleware('throttle:login');
 });
 
-// ═══════════════════════════════════════════════════════════════
-// ║  المجموعة الرئيسية: كل شيء تحت /api/admin/ + auth:sanctum   ║
-// ═══════════════════════════════════════════════════════════════
-Route::prefix('admin')->middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+Route::prefix('admin')->middleware([
+    'check.idle',
+    //'idle.timeout',   // ✅ يجب أن يعمل قبل auth:sanctum مباشرة
+    'auth:sanctum',
+    'check.sanctum',  // ✅ يتحقق من is_active ويحذف التوكن لو معطّل
+    'throttle:api',
+    'admin',          // ✅ يمنع الـ Client من الوصول لواجهة الأدمن
+])->group(function () {
 
     // ── Auth ────────────────────────────────────────────────
     Route::post('logout',  [AuthController::class, 'logout']);
