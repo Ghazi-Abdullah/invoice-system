@@ -196,29 +196,20 @@ class InvoiceController extends Controller
         }
     }
 
-    /**
-     * ✅ إضافة: جلب عدد التنبيهات للجرس
-     */
     public function notificationCounts()
     {
-        try {
-            $counts = \App\Helpers\InvoiceNotificationHelper::getCounts();
+        $counts = \App\Helpers\InvoiceNotificationHelper::getCounts();
 
-            return response()->json([
-                'status' => true,
-                'data' => [
-                    'unpaid'   => $counts['unpaid'],
-                    'overdue'  => $counts['overdue'],
-                    'due_soon' => $counts['due_soon'],
-                    'total'    => $counts['total'],
-                ],
-            ]);
-        } catch (\Exception $e) {
-            Log::error('InvoiceController notificationCounts error', ['error' => $e->getMessage()]);
-            return response()->json([
-                'status' => false,
-                'message' => __('messages.operation_failed'),
-            ], 500);
-        }
+        return response()->json([
+            'status' => true,
+            'message' => 'Notification counts fetched',
+            'data' => [
+                'unpaid'       => $counts['unpaid'],
+                'overdue'      => $counts['overdue'],
+                'due_soon'     => $counts['due_soon'],
+                'open_tickets' => $counts['open_tickets'],
+                'total'        => $counts['total'],
+            ],
+        ]);
     }
 }

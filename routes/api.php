@@ -34,7 +34,15 @@ Route::post(
 // ═══════════════════════════════════════════════════════════════
 
 // إنشاء تذكرة دعم من صفحة "اتصل بنا" (Public)
-Route::post('/support/tickets', [SupportTicketController::class, 'store']);
+//Route::post('/support/tickets', [SupportTicketController::class, 'store']);
+
+// نقطة عامة تمامًا — بدون auth أو صلاحيات، بس Rate Limited
+Route::prefix('support')->group(function () {
+    Route::post('/tickets', [SupportTicketController::class, 'store'])
+        ->middleware('throttle:support-ticket-create');
+    Route::get('/tickets/track', [SupportTicketController::class, 'track'])
+        ->middleware('throttle:support-ticket-track');
+});
 
 // التحقق من روابط الدفع
 Route::get("/payment-links/{token}/validate", [PaymentLinkController::class, "validateLink"]);

@@ -29,11 +29,15 @@ use App\Repository\Admin\InstallmentPlan\InstallmentPlanInterface;
 use App\Repository\Admin\InstallmentPlan\InstallmentPlanRepository;
 use App\Repository\Admin\InstallmentInterestTier\InstallmentInterestTierInterface;
 use App\Repository\Admin\InstallmentInterestTier\InstallmentInterestTierRepository;
+use App\Repository\Admin\SupportTicket\SupportTicketInterface;
+use App\Repository\Admin\SupportTicket\SupportTicketRepository;
 use App\Services\ExportService;
 use App\Http\Kernel;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\URL;
 use App\Constants\Constants;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -52,6 +56,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(DashboardInterface::class, DashboardRepository::class);
         $this->app->bind(InstallmentPlanInterface::class, InstallmentPlanRepository::class);
         $this->app->bind(InstallmentInterestTierInterface::class, InstallmentInterestTierRepository::class);
+        $this->app->bind(SupportTicketInterface::class, SupportTicketRepository::class);
+
+
+
 
         // Bind Services
         $this->app->singleton(ExportService::class, function ($app) {
@@ -98,6 +106,14 @@ class AppServiceProvider extends ServiceProvider
 
         Validator::replacer('valid_currency', function ($message, $attribute, $rule, $parameters) {
             return str_replace(':attribute', $attribute, 'العملة المحددة غير صالحة.');
+        });
+
+        RateLimiter::for('support-ticket-create', function ($request) {
+            return Limit::perMinute(3)->by($request->ip());
+        });
+
+        RateLimiter::for('support-ticket-track', function ($request) {
+            return Limit::perMinute(10)->by($request->ip());
         });
 
         // Set global pagination limit

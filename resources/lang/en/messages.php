@@ -12,6 +12,50 @@ return [
     'operation_failed' => 'Operation failed',
     'unauthenticated' => 'Unauthenticated',
 
+
+    'support_tickets_fetched'        => 'Support tickets fetched successfully',
+    'support_ticket_fetched'         => 'Support ticket fetched successfully',
+    'support_ticket_not_found'       => 'Support ticket not found',
+    'support_ticket_created'         => 'Support ticket created successfully',
+    'support_ticket_reply_added'     => 'Reply added successfully',
+    'support_ticket_status_updated'  => 'Ticket status updated successfully',
+    'support_ticket_deleted'         => 'Support ticket deleted successfully',
+    'support_ticket_closed_note'     => 'This ticket has been closed by the support team.',
+    'support_ticket_reopened_note'   => 'This ticket has been reopened.',
+
+    // API Responses
+    'support_tickets_fetched'        => 'Support tickets fetched successfully',
+    'support_ticket_fetched'         => 'Support ticket fetched successfully',
+    'support_ticket_not_found'       => 'Support ticket not found',
+    'support_ticket_created'         => 'Support ticket created successfully',
+    'support_ticket_reply_added'     => 'Reply added successfully',
+    'support_ticket_status_updated'  => 'Status updated successfully',
+    'support_ticket_deleted'         => 'Support ticket deleted',
+    'support_ticket_closed_note'     => 'The ticket has been closed by the support team.',
+    'support_ticket_reopened_note'   => 'The ticket has been reopened.',
+
+    // Email - Support Ticket Reply
+    'support.email.reply_subject'           => 'New reply on ticket :ticket',
+    'support.email.ticket_label'            => 'Ticket',
+    'support.email.new_reply_from_support'  => 'You have a new reply from the support team:',
+    'support.email.new_reply_from_customer' => 'New reply received from the customer:',
+    'support.email.ticket_number'           => 'Ticket Number',
+    'support.email.status'                  => 'Status',
+    'support.email.priority'                => 'Priority',
+    'support.email.view_ticket'             => 'View Ticket & Replies',
+    'support.email.cant_click'              => 'If you cannot click the button, copy this link:',
+    'support.email.auto_message'            => 'This is an automated email from the support system. Please do not reply to this email.',
+
+    // Statuses
+    'support.status.open'         => 'Open',
+    'support.status.in_progress'  => 'In Progress',
+    'support.status.closed'       => 'Closed',
+
+    // Priorities
+    'support.priority.high'   => 'High',
+    'support.priority.medium' => 'Medium',
+    'support.priority.low'    => 'Low',
+
     // Auth Messages
     'login_success' => 'Logged in successfully',
     'login_failed' => 'Invalid credentials',

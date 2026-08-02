@@ -12,6 +12,49 @@ return [
     'operation_failed' => 'فشلت العملية',
     'unauthenticated' => 'غير مصرح به',
 
+    'support_tickets_fetched'        => 'تم جلب التذاكر بنجاح',
+    'support_ticket_fetched'         => 'تم جلب التذكرة بنجاح',
+    'support_ticket_not_found'       => 'التذكرة غير موجودة',
+    'support_ticket_created'         => 'تم إنشاء التذكرة بنجاح',
+    'support_ticket_reply_added'     => 'تم إضافة الرد بنجاح',
+    'support_ticket_status_updated'  => 'تم تحديث الحالة بنجاح',
+    'support_ticket_deleted'         => 'تم حذف التذكرة',
+    'support_ticket_closed_note'     => 'تم إغلاق التذكرة من قبل فريق الدعم.',
+    'support_ticket_reopened_note'   => 'تم إعادة فتح التذكرة.',
+
+    // API Responses
+    'support_tickets_fetched'        => 'تم جلب التذاكر بنجاح',
+    'support_ticket_fetched'         => 'تم جلب التذكرة بنجاح',
+    'support_ticket_not_found'       => 'التذكرة غير موجودة',
+    'support_ticket_created'         => 'تم إنشاء التذكرة بنجاح',
+    'support_ticket_reply_added'     => 'تم إضافة الرد بنجاح',
+    'support_ticket_status_updated'  => 'تم تحديث الحالة بنجاح',
+    'support_ticket_deleted'         => 'تم حذف التذكرة',
+    'support_ticket_closed_note'     => 'تم إغلاق التذكرة من قبل فريق الدعم.',
+    'support_ticket_reopened_note'   => 'تم إعادة فتح التذكرة.',
+
+    // Email - Support Ticket Reply
+    'support.email.reply_subject'           => 'رد جديد على التذكرة :ticket',
+    'support.email.ticket_label'            => 'تذكرة',
+    'support.email.new_reply_from_support'  => 'وصلك رد جديد من فريق الدعم الفني:',
+    'support.email.new_reply_from_customer' => 'وصل رد جديد من العميل:',
+    'support.email.ticket_number'           => 'رقم التذكرة',
+    'support.email.status'                  => 'الحالة',
+    'support.email.priority'                => 'الأولوية',
+    'support.email.view_ticket'             => 'عرض التذكرة والردود',
+    'support.email.cant_click'              => 'إذا لم تستطع الضغط على الزر، انسخ هذا الرابط:',
+    'support.email.auto_message'            => 'هذا إيميل تلقائي من نظام الدعم الفني. يرجى عدم الرد على هذا الإيميل.',
+
+    // Statuses
+    'support.status.open'         => 'مفتوحة',
+    'support.status.in_progress'  => 'قيد المعالجة',
+    'support.status.closed'       => 'مغلقة',
+
+    // Priorities
+    'support.priority.high'   => 'عالية',
+    'support.priority.medium' => 'متوسطة',
+    'support.priority.low'    => 'منخفضة',
+
     // Auth Messages
     'login_success' => 'تم تسجيل الدخول بنجاح',
     'login_failed' => 'بيانات الاعتماد غير صالحة',
