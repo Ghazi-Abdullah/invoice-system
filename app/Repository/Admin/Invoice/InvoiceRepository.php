@@ -7,6 +7,7 @@ use App\Models\InvoiceItem;
 use App\Models\ActivityLog;
 use App\Models\InstallmentPlan;
 use App\Models\Installment;
+use App\Models\Client;
 use App\Constants\Constants;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -203,6 +204,20 @@ class InvoiceRepository implements InvoiceInterface
                     ]);
                     $total = $itemsTotal + $taxAmount - $discountAmount;
                 }
+            }
+
+            // ✅ التحقق من سقف الائتمان بعد احتساب الإجمالي النهائي للفاتورة
+            $client = Client::find($invoice->client_id);
+            if ($client && $client->exceedsCreditLimit($total)) {
+                DB::rollBack();
+
+                return [
+                    'status'  => false,
+                    'message' => __('messages.credit_limit_exceeded', [
+                        'limit' => number_format((float) $client->credit_limit, 2),
+                    ]),
+                    'data'    => null,
+                ];
             }
 
             // ── ✅ إنشاء خطة الأقساط إذا كانت مفعلة ─────────────────────────

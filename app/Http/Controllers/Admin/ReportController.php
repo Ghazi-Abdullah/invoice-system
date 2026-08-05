@@ -112,21 +112,40 @@ class ReportController extends Controller
     }
 
     /**
+     * تقرير أعمار الديون
+     */
+    public function aging(ReportFilterRequest $request): JsonResponse
+    {
+        try {
+            $filters = $request->validated();
+            $report = $this->reportRepository->getAgingReport($filters);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم تحميل تقرير أعمار الديون بنجاح',
+                'data' => $report
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل في تحميل التقرير: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * تصدير التقرير
      */
     public function export(Request $request, string $type): JsonResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         try {
-            // ضبط اللغة إذا تم إرسالها
             if ($request->has('lang')) {
                 app()->setLocale($request->input('lang'));
             }
 
             $filters = $request->all();
-            // إزالة lang من الفلاتر حتى لا يؤثر على الاستعلام
             unset($filters['lang']);
 
-            // إضافة تواريخ افتراضية إذا لم تكن موجودة
             if (empty($filters['start_date'])) {
                 $filters['start_date'] = now()->subDays(30)->format('Y-m-d');
             }
@@ -134,7 +153,6 @@ class ReportController extends Controller
                 $filters['end_date'] = now()->format('Y-m-d');
             }
 
-            // جلب البيانات حسب نوع التقرير
             $reportData = $this->getReportData($type, $filters);
 
             if (empty($reportData['items'])) {
@@ -144,14 +162,12 @@ class ReportController extends Controller
                 ], 404);
             }
 
-            // اختيار كلاس التصدير المناسب
             $exportClass = $this->getExportClass($type, $reportData);
 
             if ($request->has('download') && $request->input('download') === '1') {
                 return Excel::download($exportClass, $this->getFileName($type));
             }
 
-            // حفظ في الخادم
             $fileName = $this->getFileName($type, true);
             $filePath = 'exports/' . $fileName;
             Excel::store($exportClass, $filePath, 'public');
@@ -271,7 +287,6 @@ class ReportController extends Controller
                 }
             }
 
-            // ترتيب حسب تاريخ التعديل (الأحدث أولاً)
             usort($files, function ($a, $b) {
                 return strtotime($b['modified']) - strtotime($a['modified']);
             });

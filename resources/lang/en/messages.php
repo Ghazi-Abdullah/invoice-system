@@ -46,6 +46,8 @@ return [
     'support.email.cant_click'              => 'If you cannot click the button, copy this link:',
     'support.email.auto_message'            => 'This is an automated email from the support system. Please do not reply to this email.',
 
+    'credit_limit_exceeded' => 'Credit limit exceeded (:limit), unable to create invoice',
+
     // Statuses
     'support.status.open'         => 'Open',
     'support.status.in_progress'  => 'In Progress',

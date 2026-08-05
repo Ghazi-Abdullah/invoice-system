@@ -45,6 +45,9 @@ return [
     'support.email.cant_click'              => 'إذا لم تستطع الضغط على الزر، انسخ هذا الرابط:',
     'support.email.auto_message'            => 'هذا إيميل تلقائي من نظام الدعم الفني. يرجى عدم الرد على هذا الإيميل.',
 
+    'credit_limit_exceeded' => 'تجاوز سقف الائتمان المسموح به (:limit)، لا يمكن إنشاء الفاتورة',
+
+
     // Statuses
     'support.status.open'         => 'مفتوحة',
     'support.status.in_progress'  => 'قيد المعالجة',

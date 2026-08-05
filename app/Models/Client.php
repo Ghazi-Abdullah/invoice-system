@@ -21,6 +21,7 @@ class Client extends Model
         'company_name',
         'tax_number',
         'payment_terms',
+        'credit_limit',
         'currency',
         'notes',
         'is_active',
@@ -39,8 +40,9 @@ class Client extends Model
      * الكود القديم كان يضع 'id', 'created_at' إلخ كـ casts وهو خطأ
      */
     protected $casts = [
-        'is_active'  => 'boolean',
-        'created_by' => 'integer',
+        'is_active'    => 'boolean',
+        'created_by'   => 'integer',
+        'credit_limit' => 'decimal:2',
     ];
 
     // ================================================================
@@ -109,5 +111,29 @@ class Client extends Model
     public function totalDue(): float
     {
         return $this->totalInvoiced() - $this->totalPaid();
+    }
+
+    /**
+     * ✅ الرصيد الائتماني المتبقي. null يعني بدون سقف (غير محدود).
+     */
+    public function remainingCredit(): ?float
+    {
+        if ($this->credit_limit === null) {
+            return null;
+        }
+
+        return (float) $this->credit_limit - $this->totalDue();
+    }
+
+    /**
+     * ✅ هل يتجاوز العميل سقف الائتمان لو أضفنا مبلغاً جديداً؟
+     */
+    public function exceedsCreditLimit(float $additionalAmount = 0): bool
+    {
+        if ($this->credit_limit === null) {
+            return false;
+        }
+
+        return ($this->totalDue() + $additionalAmount) > (float) $this->credit_limit;
     }
 }

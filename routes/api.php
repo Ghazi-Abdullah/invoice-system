@@ -100,6 +100,7 @@ Route::prefix('admin')->middleware([
     require __DIR__ . '/admin/admin-groups.php';
     require __DIR__ . '/admin/payments.php';
     require __DIR__ . '/admin/reports.php';
+    require __DIR__ . '/admin/recurring-invoices.php';
     require __DIR__ . '/admin/payment-links.php';
     require __DIR__ . '/admin/support.php';
 });

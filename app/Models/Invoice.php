@@ -28,9 +28,11 @@ class Invoice extends Model
         'footer',
         'enable_stripe_checkout',
         'sent_at',
+        'due_reminder_sent_at',   // ← جديد
         'paid_at',
         'created_by',
         'is_active',
+
     ];
 
     protected $hidden = [
@@ -42,6 +44,7 @@ class Invoice extends Model
         'due_date'               => 'date',
         'payment_date'           => 'date',
         'sent_at'                => 'datetime',
+        'due_reminder_sent_at'   => 'datetime',   // ← جديد
         'paid_at'                => 'datetime',
         'subtotal'               => 'decimal:2',
         'tax_amount'             => 'decimal:2',

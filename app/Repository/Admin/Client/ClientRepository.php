@@ -13,14 +13,12 @@ class ClientRepository implements ClientInterface
     public function index($request)
     {
         try {
-            // ✅ بدل with(['user','invoices']) ثم loop بـ 4 queries لكل عميل
-            // نستخدم withCount + withSum في query واحد
             $query = Client::withCount('invoices')
                 ->withSum('invoices', 'total')
                 ->withSum(['invoices as paid_amount' => function ($q) {
                     $q->where('status', Constants::INVOICE_STATUS_PAID);
                 }], 'total')
-                ->with('creator:id,name')        // ✅ select فقط ما نحتاجه
+                ->with('creator:id,name')
                 ->orderBy('created_at', 'desc');
 
             if ($request->has('is_active') && $request->is_active !== '') {
@@ -41,7 +39,6 @@ class ClientRepository implements ClientInterface
                 $clients = $query->paginate(Constants::DEFAULT_PER_PAGE);
             }
 
-            // ✅ حساب total_due من البيانات المحملة — بدون queries إضافية
             $clients->getCollection()->transform(function ($client) {
                 $client->total_invoiced = (float) ($client->invoices_sum_total ?? 0);
                 $client->total_paid     = (float) ($client->paid_amount ?? 0);
@@ -76,7 +73,6 @@ class ClientRepository implements ClientInterface
                 ];
             }
 
-            // ✅ كل الإحصائيات في query واحد
             $client = Client::withCount('invoices')
                 ->withSum('invoices', 'total')
                 ->withSum(['invoices as paid_amount' => function ($q) {
@@ -142,6 +138,7 @@ class ClientRepository implements ClientInterface
                 'company_name'  => $request->company_name,
                 'tax_number'    => $request->tax_number,
                 'payment_terms' => $request->payment_terms ?? Constants::PAYMENT_TERM_NET_30,
+                'credit_limit'  => $request->credit_limit,
                 'currency'      => $request->currency      ?? Constants::CURRENCY_SAR,
                 'notes'         => $request->notes,
                 'is_active'     => $request->is_active ?? true,
@@ -194,6 +191,7 @@ class ClientRepository implements ClientInterface
                 'company_name',
                 'tax_number',
                 'payment_terms',
+                'credit_limit',
                 'currency',
                 'notes',
                 'is_active',
@@ -219,7 +217,6 @@ class ClientRepository implements ClientInterface
 
             DB::commit();
 
-            // ✅ إعادة تحميل مع الإحصائيات بـ query واحد
             $client = Client::withCount('invoices')
                 ->withSum('invoices', 'total')
                 ->withSum(['invoices as paid_amount' => fn($q) => $q->where('status', Constants::INVOICE_STATUS_PAID)], 'total')
@@ -252,7 +249,6 @@ class ClientRepository implements ClientInterface
         DB::beginTransaction();
 
         try {
-            // ✅ withCount بدل invoices()->count()
             $client->loadCount('invoices');
 
             if ($client->invoices_count > 0) {
@@ -291,7 +287,6 @@ class ClientRepository implements ClientInterface
     public function getClientStats($client)
     {
         try {
-            // ✅ كل الإحصائيات في query واحد بدل 5 queries
             $stats = $client->invoices()
                 ->selectRaw('
                     COUNT(*) as total_invoices,
@@ -334,7 +329,6 @@ class ClientRepository implements ClientInterface
         try {
             $search = substr(trim($request->search ?? ''), 0, 100);
 
-            // ✅ select فقط الحقول المطلوبة — لا تجلب كل الـ columns
             $clients = Client::select(['id', 'name', 'email', 'phone', 'company_name', 'is_active'])
                 ->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -364,7 +358,6 @@ class ClientRepository implements ClientInterface
     public function getClientInvoices($client)
     {
         try {
-            // ✅ with للعلاقات المطلوبة في العرض
             $invoices = $client->invoices()
                 ->with(['items'])
                 ->orderBy('created_at', 'desc')

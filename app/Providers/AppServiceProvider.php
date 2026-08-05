@@ -31,6 +31,8 @@ use App\Repository\Admin\InstallmentInterestTier\InstallmentInterestTierInterfac
 use App\Repository\Admin\InstallmentInterestTier\InstallmentInterestTierRepository;
 use App\Repository\Admin\SupportTicket\SupportTicketInterface;
 use App\Repository\Admin\SupportTicket\SupportTicketRepository;
+use App\Repository\Admin\RecurringInvoice\RecurringInvoiceInterface;
+use App\Repository\Admin\RecurringInvoice\RecurringInvoiceRepository;
 use App\Services\ExportService;
 use App\Http\Kernel;
 use Illuminate\Support\Facades\Validator;
@@ -57,6 +59,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(InstallmentPlanInterface::class, InstallmentPlanRepository::class);
         $this->app->bind(InstallmentInterestTierInterface::class, InstallmentInterestTierRepository::class);
         $this->app->bind(SupportTicketInterface::class, SupportTicketRepository::class);
+        $this->app->bind(RecurringInvoiceInterface::class, RecurringInvoiceRepository::class);
 
 
 
