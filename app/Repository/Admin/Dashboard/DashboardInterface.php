@@ -6,5 +6,5 @@ use App\Models\User;
 
 interface DashboardInterface
 {
-    public function getDashboardData(User $user): array;
+    public function getDashboardData(User $user, ?int $branchId = null): array;
 }

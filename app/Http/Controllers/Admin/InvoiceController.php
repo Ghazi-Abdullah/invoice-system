@@ -65,22 +65,23 @@ class InvoiceController extends Controller
         return response()->json($result, $result['status'] ? 200 : 500);
     }
 
-    public function dashboardStats()
+    public function dashboardStats(Request $request)
     {
-        $result = $this->invoiceRepository->getDashboardStats();
+        $result = $this->invoiceRepository->getDashboardStats($request->attributes->get('selected_branch_id'));
         return response()->json($result, $result['status'] ? 200 : 500);
     }
 
-    public function overdueInvoices()
+    public function overdueInvoices(Request $request)
     {
-        $result = $this->invoiceRepository->getOverdueInvoices();
+        $result = $this->invoiceRepository->getOverdueInvoices($request->attributes->get('selected_branch_id'));
         return response()->json($result, $result['status'] ? 200 : 500);
     }
 
     public function recentInvoices(Request $request)
     {
         $limit = $request->get('limit', 10);
-        $result = $this->invoiceRepository->getRecentInvoices($limit);
+        $branchId = $request->attributes->get('selected_branch_id');
+        $result = $this->invoiceRepository->getRecentInvoices($limit, $branchId);
         return response()->json($result, $result['status'] ? 200 : 500);
     }
 

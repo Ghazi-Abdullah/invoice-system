@@ -24,6 +24,7 @@ class ReportRepository implements ReportInterface
                 ->when(!empty($filters['status']),     fn($q) => $q->where('status', $filters['status']))
                 ->when(!empty($filters['client_id']),  fn($q) => $q->where('client_id', (int) $filters['client_id']))
                 ->when(!empty($filters['user_id']),    fn($q) => $q->where('user_id', (int) $filters['user_id']))
+                ->when(!empty($filters['branch_id']),  fn($q) => $q->where('branch_id', (int) $filters['branch_id']))
                 ->orderBy('invoice_date', 'desc');
 
             $perPage  = min((int) ($filters['per_page'] ?? 20), 100);
@@ -33,6 +34,7 @@ class ReportRepository implements ReportInterface
                 ->when(!empty($filters['end_date']),   fn($q) => $q->whereDate('invoice_date', '<=', $filters['end_date']))
                 ->when(!empty($filters['status']),     fn($q) => $q->where('status', $filters['status']))
                 ->when(!empty($filters['client_id']),  fn($q) => $q->where('client_id', (int) $filters['client_id']))
+                ->when(!empty($filters['branch_id']),  fn($q) => $q->where('branch_id', (int) $filters['branch_id']))
                 ->selectRaw('
                     COUNT(*) as total_invoices,
                     SUM(total) as total_amount,
@@ -73,14 +75,18 @@ class ReportRepository implements ReportInterface
         try {
             $query = Client::withCount(['invoices' => function ($q) use ($filters) {
                 $this->applyDateFilters($q, $filters);
+                $this->applyBranchFilter($q, $filters);
             }])
                 ->withSum(['invoices as invoices_sum_total' => function ($q) use ($filters) {
                     $this->applyDateFilters($q, $filters);
+                    $this->applyBranchFilter($q, $filters);
                 }], 'total')
                 ->withSum(['invoices as paid_sum' => function ($q) use ($filters) {
                     $this->applyDateFilters($q, $filters);
+                    $this->applyBranchFilter($q, $filters);
                     $q->where('status', Constants::INVOICE_STATUS_PAID);
                 }], 'total')
+                ->when(!empty($filters['branch_id']), fn($q) => $q->where('branch_id', (int) $filters['branch_id']))
                 ->orderBy('invoices_count', 'desc');
 
             if (!empty($filters['client_id'])) {
@@ -146,6 +152,7 @@ class ReportRepository implements ReportInterface
                 ->when(!empty($filters['start_date']), fn($q) => $q->whereDate('invoice_date', '>=', $filters['start_date']))
                 ->when(!empty($filters['end_date']),   fn($q) => $q->whereDate('invoice_date', '<=', $filters['end_date']))
                 ->when(!empty($filters['status']),     fn($q) => $q->where('status', $filters['status']))
+                ->when(!empty($filters['branch_id']),  fn($q) => $q->where('branch_id', (int) $filters['branch_id']))
                 ->groupBy('month')
                 ->orderBy('month', 'desc')
                 ->get();
@@ -198,6 +205,7 @@ class ReportRepository implements ReportInterface
                 })
                 ->when(!empty($filters['start_date']), fn($q) => $q->whereDate('invoice_date', '>=', $filters['start_date']))
                 ->when(!empty($filters['end_date']),   fn($q) => $q->whereDate('invoice_date', '<=', $filters['end_date']))
+                ->when(!empty($filters['branch_id']),  fn($q) => $q->where('branch_id', (int) $filters['branch_id']))
                 ->orderBy('due_date', 'asc')
                 ->get();
 
@@ -260,6 +268,7 @@ class ReportRepository implements ReportInterface
                         });
                 })
                 ->when(!empty($filters['client_id']), fn($q) => $q->where('client_id', (int) $filters['client_id']))
+                ->when(!empty($filters['branch_id']), fn($q) => $q->where('branch_id', (int) $filters['branch_id']))
                 ->orderBy('due_date', 'asc')
                 ->get();
 
@@ -316,10 +325,11 @@ class ReportRepository implements ReportInterface
         }
     }
 
-    public function getDashboardStats(): array
+    public function getDashboardStats(?int $branchId = null): array
     {
         try {
-            $invoiceStats = Invoice::selectRaw('
+            $invoiceStats = Invoice::when($branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->selectRaw('
                 COUNT(*) as total_invoices,
                 SUM(total) as total_amount,
                 SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as paid_invoices,
@@ -340,7 +350,7 @@ class ReportRepository implements ReportInterface
                 'paid_amount'      => (float)  ($invoiceStats->paid_amount      ?? 0),
                 'overdue_invoices' => (int)   ($invoiceStats->overdue_invoices ?? 0),
                 'overdue_amount'   => (float)  ($invoiceStats->overdue_amount   ?? 0),
-                'total_clients'    => Client::count(),
+                'total_clients'    => Client::when($branchId, fn($q) => $q->where('branch_id', $branchId))->count(),
             ];
         } catch (\Exception $e) {
             Log::error('ReportRepository getDashboardStats error', ['error' => $e->getMessage()]);
@@ -428,6 +438,17 @@ class ReportRepository implements ReportInterface
         }
         if (!empty($filters['end_date'])) {
             $query->whereDate('invoice_date', '<=', $filters['end_date']);
+        }
+    }
+
+    /**
+     * ✅ إضافة: فلترة حسب الفرع - تستخدم داخل الـ closures المتداخلة
+     * (withCount/withSum) بنفس طريقة applyDateFilters()
+     */
+    private function applyBranchFilter($query, array $filters): void
+    {
+        if (!empty($filters['branch_id'])) {
+            $query->where('branch_id', (int) $filters['branch_id']);
         }
     }
 

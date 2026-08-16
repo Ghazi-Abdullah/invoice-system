@@ -30,6 +30,7 @@ class ReportController extends Controller
     {
         try {
             $filters = $request->validated();
+            $filters['branch_id'] = $request->attributes->get('selected_branch_id');
             $report = $this->reportRepository->getInvoiceReport($filters);
 
             return response()->json([
@@ -52,6 +53,7 @@ class ReportController extends Controller
     {
         try {
             $filters = $request->validated();
+            $filters['branch_id'] = $request->attributes->get('selected_branch_id');
             $report = $this->reportRepository->getClientReport($filters);
 
             return response()->json([
@@ -74,6 +76,7 @@ class ReportController extends Controller
     {
         try {
             $filters = $request->validated();
+            $filters['branch_id'] = $request->attributes->get('selected_branch_id');
             $report = $this->reportRepository->getRevenueReport($filters);
 
             return response()->json([
@@ -96,6 +99,7 @@ class ReportController extends Controller
     {
         try {
             $filters = $request->validated();
+            $filters['branch_id'] = $request->attributes->get('selected_branch_id');
             $report = $this->reportRepository->getOverdueReport($filters);
 
             return response()->json([
@@ -118,6 +122,7 @@ class ReportController extends Controller
     {
         try {
             $filters = $request->validated();
+            $filters['branch_id'] = $request->attributes->get('selected_branch_id');
             $report = $this->reportRepository->getAgingReport($filters);
 
             return response()->json([
@@ -145,6 +150,7 @@ class ReportController extends Controller
 
             $filters = $request->all();
             unset($filters['lang']);
+            $filters['branch_id'] = $request->attributes->get('selected_branch_id');
 
             if (empty($filters['start_date'])) {
                 $filters['start_date'] = now()->subDays(30)->format('Y-m-d');

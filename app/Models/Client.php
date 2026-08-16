@@ -10,9 +10,6 @@ class Client extends Model
 {
     use HasFactory;
 
-    /**
-     * ✅ $fillable محدد بدقة
-     */
     protected $fillable = [
         'name',
         'email',
@@ -26,37 +23,28 @@ class Client extends Model
         'notes',
         'is_active',
         'created_by',
+        'branch_id',
     ];
 
-    /**
-     * ✅ $hidden — إخفاء الحقول الحساسة من الاستجابات
-     */
     protected $hidden = [
-        'created_by',  // لا يُكشف في الـ API
+        'created_by',
     ];
 
-    /**
-     * ✅ Casts صحيحة — لا array خاطئ كما كان في الكود الأصلي
-     * الكود القديم كان يضع 'id', 'created_at' إلخ كـ casts وهو خطأ
-     */
     protected $casts = [
         'is_active'    => 'boolean',
         'created_by'   => 'integer',
         'credit_limit' => 'decimal:2',
+        'branch_id'    => 'integer',
     ];
 
     // ================================================================
     // Scopes
     // ================================================================
-
     public function scopeActive($query)
     {
         return $query->where('is_active', Constants::ACTIVE);
     }
 
-    /**
-     * ✅ Search scope محمي — الحد بـ 100 حرف
-     */
     public function scopeSearch($query, string $search)
     {
         $search = substr(trim($search), 0, 100);
@@ -69,10 +57,18 @@ class Client extends Model
         });
     }
 
+    // ✅ جديد: فلترة حسب الفرع
+    public function scopeByBranch($query, ?int $branchId)
+    {
+        if ($branchId) {
+            return $query->where('branch_id', $branchId);
+        }
+        return $query;
+    }
+
     // ================================================================
     // Relations
     // ================================================================
-
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -94,10 +90,15 @@ class Client extends Model
         return $this->hasMany(Payment::class);
     }
 
+    // ✅ جديد: علاقة الفرع
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
     // ================================================================
     // Methods
     // ================================================================
-
     public function totalInvoiced(): float
     {
         return (float) $this->invoices()->sum('total');
@@ -113,9 +114,6 @@ class Client extends Model
         return $this->totalInvoiced() - $this->totalPaid();
     }
 
-    /**
-     * ✅ الرصيد الائتماني المتبقي. null يعني بدون سقف (غير محدود).
-     */
     public function remainingCredit(): ?float
     {
         if ($this->credit_limit === null) {
@@ -125,9 +123,6 @@ class Client extends Model
         return (float) $this->credit_limit - $this->totalDue();
     }
 
-    /**
-     * ✅ هل يتجاوز العميل سقف الائتمان لو أضفنا مبلغاً جديداً؟
-     */
     public function exceedsCreditLimit(float $additionalAmount = 0): bool
     {
         if ($this->credit_limit === null) {

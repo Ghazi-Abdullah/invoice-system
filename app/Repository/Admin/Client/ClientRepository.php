@@ -19,6 +19,7 @@ class ClientRepository implements ClientInterface
                     $q->where('status', Constants::INVOICE_STATUS_PAID);
                 }], 'total')
                 ->with('creator:id,name')
+                ->when($request->attributes->get('selected_branch_id'), fn($q, $branchId) => $q->where('branch_id', $branchId))
                 ->orderBy('created_at', 'desc');
 
             if ($request->has('is_active') && $request->is_active !== '') {
@@ -130,6 +131,23 @@ class ClientRepository implements ClientInterface
                 ];
             }
 
+            // ✅ الفرع: من الطلب صراحة إن وُجد، وإلا الفرع المختار حالياً؛
+            // ونتحقق أن المستخدم فعلاً يملك صلاحية الوصول لهذا الفرع
+            $branchId = $request->has('branch_id') && $request->branch_id
+                ? (int) $request->branch_id
+                : $request->attributes->get('selected_branch_id');
+
+            $allowedBranchIds = $request->attributes->get('allowed_branch_ids');
+            if ($branchId && is_array($allowedBranchIds) && !in_array((int) $branchId, $allowedBranchIds, true)) {
+                DB::rollBack();
+
+                return [
+                    'status'  => false,
+                    'message' => 'ليس لديك صلاحية لإضافة عميل لهذا الفرع',
+                    'data'    => null,
+                ];
+            }
+
             $client = Client::create([
                 'name'          => $request->name,
                 'email'         => strtolower(trim($request->email)),
@@ -142,6 +160,7 @@ class ClientRepository implements ClientInterface
                 'currency'      => $request->currency      ?? Constants::CURRENCY_SAR,
                 'notes'         => $request->notes,
                 'is_active'     => $request->is_active ?? true,
+                'branch_id'     => $branchId ? (int) $branchId : null,
                 'created_by'    => auth()->id(),
             ]);
 
@@ -195,6 +214,7 @@ class ClientRepository implements ClientInterface
                 'currency',
                 'notes',
                 'is_active',
+                'branch_id',
             ];
 
             $updateData = [];
@@ -209,6 +229,23 @@ class ClientRepository implements ClientInterface
             }
             if (isset($updateData['email'])) {
                 $updateData['email'] = strtolower(trim($updateData['email']));
+            }
+
+            // ✅ نقل العميل لفرع آخر - العميل فقط، فواتيره القديمة تبقى
+            // على فرعها الأصلي (لا تنتقل معه تلقائيًا)
+            if (array_key_exists('branch_id', $updateData)) {
+                $newBranchId = $updateData['branch_id'] ? (int) $updateData['branch_id'] : null;
+                $allowedBranchIds = $request->attributes->get('allowed_branch_ids');
+
+                if ($newBranchId && is_array($allowedBranchIds) && !in_array($newBranchId, $allowedBranchIds, true)) {
+                    return [
+                        'status'  => false,
+                        'message' => 'ليس لديك صلاحية لنقل العميل لهذا الفرع',
+                        'data'    => null,
+                    ];
+                }
+
+                $updateData['branch_id'] = $newBranchId;
             }
 
             $client->update($updateData);
@@ -329,7 +366,8 @@ class ClientRepository implements ClientInterface
         try {
             $search = substr(trim($request->search ?? ''), 0, 100);
 
-            $clients = Client::select(['id', 'name', 'email', 'phone', 'company_name', 'is_active'])
+            $clients = Client::select(['id', 'name', 'email', 'phone', 'company_name', 'is_active', 'branch_id'])
+                ->when($request->attributes->get('selected_branch_id'), fn($q, $branchId) => $q->where('branch_id', $branchId))
                 ->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
@@ -358,6 +396,8 @@ class ClientRepository implements ClientInterface
     public function getClientInvoices($client)
     {
         try {
+            // ملاحظة: بلا فلترة فرع عمداً - صفحة العميل تعرض سجله الكامل
+            // حتى لو جزء منه يعود لفرع نُقل منه لاحقًا
             $invoices = $client->invoices()
                 ->with(['items'])
                 ->orderBy('created_at', 'desc')

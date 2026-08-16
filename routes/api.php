@@ -92,6 +92,7 @@ Route::prefix('admin')->middleware([
 
     // ── Includes ────────────────────────────────────────────
     require __DIR__ . '/admin/clients.php';
+    require __DIR__ . '/admin/branches.php';
     require __DIR__ . '/admin/invoices.php';
     require __DIR__ . '/admin/installments.php';
     require __DIR__ . '/admin/users.php';

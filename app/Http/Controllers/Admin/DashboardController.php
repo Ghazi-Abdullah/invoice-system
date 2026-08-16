@@ -27,7 +27,8 @@ class DashboardController extends Controller
                 ], 401);
             }
 
-            $data = $this->dashboardRepository->getDashboardData($user);
+            $branchId = $request->attributes->get('selected_branch_id');
+            $data = $this->dashboardRepository->getDashboardData($user, $branchId);
 
             return response()->json([
                 'status' => true,
@@ -55,7 +56,8 @@ class DashboardController extends Controller
                 return response()->json(['status' => false, 'message' => 'غير مصرح'], 401);
             }
 
-            $data = $this->dashboardRepository->getDashboardData($user);
+            $branchId = $request->attributes->get('selected_branch_id');
+            $data = $this->dashboardRepository->getDashboardData($user, $branchId);
 
             return response()->json([
                 'status' => true,
@@ -80,7 +82,8 @@ class DashboardController extends Controller
                 return response()->json(['status' => false, 'message' => 'غير مصرح'], 401);
             }
 
-            $data = $this->dashboardRepository->getDashboardData($user);
+            $branchId = $request->attributes->get('selected_branch_id');
+            $data = $this->dashboardRepository->getDashboardData($user, $branchId);
 
             return response()->json([
                 'status' => true,
@@ -105,7 +108,8 @@ class DashboardController extends Controller
                 return response()->json(['status' => false, 'message' => 'غير مصرح'], 401);
             }
 
-            $data = $this->dashboardRepository->getDashboardData($user);
+            $branchId = $request->attributes->get('selected_branch_id');
+            $data = $this->dashboardRepository->getDashboardData($user, $branchId);
 
             return response()->json([
                 'status' => true,

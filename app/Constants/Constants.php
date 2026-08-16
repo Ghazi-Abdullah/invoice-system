@@ -27,6 +27,7 @@ class Constants
     const CREATE_CLIENT = 'create_client';
     const EDIT_CLIENT = 'edit_client';
     const DELETE_CLIENT = 'delete_client';
+    const MANAGE_BRANCHES = 'manage_branches';
     const VIEW_USERS = 'view_users';
     const CREATE_USER = 'create_user';
     const EDIT_USER = 'edit_user';
@@ -110,7 +111,7 @@ class Constants
 
     // System Settings
     const SYSTEM_NAME_EN = 'Invoice System';
-    const SYSTEM_NAME_AR = 'نظام الفواتير';
+    const SYSTEM_NAME_AR = 'Ù†Ø¸Ø§Ù… Ø§Ù„ÙÙˆØ§ØªÙŠØ±';
     const SYSTEM_VERSION = '1.0.0';
 
     // Notification Types
@@ -131,7 +132,7 @@ class Constants
     const EXPORT_CSV = 'csv';
     const CACHE_TTL_INVOICES = 600; // 10 minutes
 
-    // Payment Statuses (بجانب Invoice Statuses)
+    // Payment Statuses (Ø¨Ø¬Ø§Ù†Ø¨ Invoice Statuses)
     const PAYMENT_STATUS_PENDING = 'pending';
     const PAYMENT_STATUS_COMPLETED = 'completed';
     const PAYMENT_STATUS_FAILED = 'failed';
@@ -142,7 +143,7 @@ class Constants
     const PAYMENT_METHOD_BANK_TRANSFER = 'bank_transfer';
     const PAYMENT_METHOD_CASH = 'cash';
 
-    // Permissions (بجانب الصلاحيات الحالية)
+    // Permissions (Ø¨Ø¬Ø§Ù†Ø¨ Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ§Øª Ø§Ù„Ø­Ø§Ù„ÙŠØ©)
     const CREATE_PAYMENT = 'create_payment';
     const VIEW_PAYMENTS = 'view_payments';
     const REFUND_PAYMENT = 'refund_payment';
@@ -153,7 +154,7 @@ class Constants
     const DELETE_SUPPORT_TICKET = 'delete_support_ticket';
     const REFUND_PAYMENTS = 'refund_payments';
 
-    // Response Messages (أضف في قسم messages)
+    // Response Messages (Ø£Ø¶Ù ÙÙŠ Ù‚Ø³Ù… messages)
     const MESSAGE_PAYMENT_SESSION_CREATED = 'payment_session_created';
     const MESSAGE_PAYMENT_SUCCESS = 'payment_success';
     const MESSAGE_PAYMENT_FAILED = 'payment_failed';

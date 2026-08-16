@@ -50,6 +50,7 @@ class Kernel extends HttpKernel
         'idle.timeout'     => \App\Http\Middleware\CheckIdleTimeout::class,
         'permission'       => \App\Http\Middleware\CheckPermission::class,
         'admin'            => \App\Http\Middleware\AdminMiddleware::class,
+        'branch'           => \App\Http\Middleware\BranchMiddleware::class,
     ];
 
     public static function configureRateLimiting(): void

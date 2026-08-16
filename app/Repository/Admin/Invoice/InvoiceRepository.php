@@ -35,6 +35,7 @@ class InvoiceRepository implements InvoiceInterface
     {
         try {
             $query = Invoice::with(['client', 'items', 'createdBy'])
+                ->when($request->attributes->get('selected_branch_id'), fn($q, $branchId) => $q->where('branch_id', $branchId))
                 ->orderBy('created_at', 'desc');
 
             // ✅ تحقق من الـ status قبل استخدامه في الـ Query
@@ -173,9 +174,27 @@ class InvoiceRepository implements InvoiceInterface
                 ];
             }
 
+            // ✅ الفرع: من الطلب صراحة إن وُجد، وإلا الفرع المختار حالياً؛
+            // ونتحقق أن المستخدم فعلاً يملك صلاحية الوصول لهذا الفرع
+            $branchId = $request->has('branch_id') && $request->branch_id
+                ? (int) $request->branch_id
+                : $request->attributes->get('selected_branch_id');
+
+            $allowedBranchIds = $request->attributes->get('allowed_branch_ids');
+            if ($branchId && is_array($allowedBranchIds) && !in_array((int) $branchId, $allowedBranchIds, true)) {
+                DB::rollBack();
+
+                return [
+                    'status'  => false,
+                    'message' => 'ليس لديك صلاحية لإضافة فاتورة لهذا الفرع',
+                    'data'    => null,
+                ];
+            }
+
             $invoice = Invoice::create([
                 'client_id'              => (int) $request->client_id,
                 'user_id'                => $userId,
+                'branch_id'              => $branchId ? (int) $branchId : null,
                 'invoice_number'         => $invoiceNumber,
                 'invoice_date'           => $request->invoice_date,
                 'due_date'               => $request->due_date,
@@ -301,8 +320,27 @@ class InvoiceRepository implements InvoiceInterface
             $taxAmount      = max(0, (float) ($request->tax_amount ?? $invoice->tax_amount));
             $discountAmount = max(0, (float) ($request->discount_amount ?? $invoice->discount_amount));
 
+            // ✅ نقل الفاتورة لفرع آخر عند الطلب الصريح فقط - الفواتير لا
+            // تتبع نقل العميل بين الفروع تلقائيًا، هذا هو المسار الوحيد لنقلها
+            $branchId = $invoice->branch_id;
+            if ($request->has('branch_id')) {
+                $newBranchId = $request->branch_id ? (int) $request->branch_id : null;
+                $allowedBranchIds = $request->attributes->get('allowed_branch_ids');
+
+                if ($newBranchId && is_array($allowedBranchIds) && !in_array($newBranchId, $allowedBranchIds, true)) {
+                    return [
+                        'status'  => false,
+                        'message' => 'ليس لديك صلاحية لنقل الفاتورة لهذا الفرع',
+                        'data'    => null,
+                    ];
+                }
+
+                $branchId = $newBranchId;
+            }
+
             $invoice->update([
                 'client_id'       => $request->client_id       ? (int) $request->client_id : $invoice->client_id,
+                'branch_id'       => $branchId,
                 'invoice_number'  => $request->invoice_number  ?? $invoice->invoice_number,
                 'invoice_date'    => $request->invoice_date    ?? $invoice->invoice_date,
                 'due_date'        => $request->due_date        ?? $invoice->due_date,
@@ -570,10 +608,11 @@ class InvoiceRepository implements InvoiceInterface
         }
     }
 
-    public function getDashboardStats()
+    public function getDashboardStats(?int $branchId = null)
     {
         try {
-            $stats = Invoice::selectRaw('
+            $stats = Invoice::when($branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->selectRaw('
                 COUNT(*) as total_invoices,
                 SUM(total) as total_amount,
                 SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as paid_invoices,
@@ -611,11 +650,12 @@ class InvoiceRepository implements InvoiceInterface
         }
     }
 
-    public function getRecentInvoices($limit = 10)
+    public function getRecentInvoices($limit = 10, ?int $branchId = null)
     {
         try {
             $limit    = min((int) $limit, 50);
             $invoices = Invoice::with(['client'])
+                ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
                 ->orderBy('created_at', 'desc')
                 ->limit($limit)
                 ->get();
@@ -636,7 +676,7 @@ class InvoiceRepository implements InvoiceInterface
         }
     }
 
-    public function getOverdueInvoices()
+    public function getOverdueInvoices(?int $branchId = null)
     {
         try {
             $invoices = Invoice::with(['client'])
@@ -647,6 +687,7 @@ class InvoiceRepository implements InvoiceInterface
                                 ->where('due_date', '<', now());
                         });
                 })
+                ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
                 ->orderBy('due_date', 'asc')
                 ->get();
 
