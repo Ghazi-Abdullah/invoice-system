@@ -66,7 +66,7 @@ class PaymentLinkController extends Controller
 
             return response()->json([
                 'status'  => true,
-                'message' => 'تم إنشاء رابط الدفع بنجاح',
+                'message' => 'created',
                 'data'    => $link,
             ], 201);
         } catch (\Exception $e) {
@@ -105,7 +105,7 @@ class PaymentLinkController extends Controller
 
             return response()->json([
                 'status'  => true,
-                'message' => 'تم إنشاء رابط الدفع للقسط بنجاح',
+                'message' => 'created',
                 'data'    => $link,
             ], 201);
         } catch (\Exception $e) {
@@ -141,7 +141,7 @@ class PaymentLinkController extends Controller
 
         return response()->json([
             'status'  => $result,
-            'message'   => $result ? 'تم إرسال الرابط بنجاح' : 'فشل إرسال الرابط',
+            'message'   => $result ? 'created' : 'failed',
         ]);
     }
 
@@ -156,7 +156,7 @@ class PaymentLinkController extends Controller
         if (!$link) {
             return response()->json([
                 'status'  => false,
-                'message' => 'رابط الدفع غير صالح أو منتهي الصلاحية',
+                'message' => 'invalid_or_expired',
             ], 404);
         }
 

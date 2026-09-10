@@ -3,180 +3,110 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\SupportTicket\ReplySupportTicketRequest;
+use App\Http\Requests\Admin\SupportTicket\StoreSupportTicketRequest;
+use App\Http\Requests\Admin\SupportTicket\UpdateSupportTicketStatusRequest;
+use App\Http\Requests\Admin\SupportTicket\AssignSupportTicketRequest;
+    use App\Http\Requests\Admin\SupportTicket\TrackSupportTicketRequest;
 use App\Models\SupportTicket;
-use App\Models\SupportTicketReply;
+use App\Repository\Admin\SupportTicket\SupportTicketInterface;
+use App\Traits\ResponseTrait;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class SupportTicketController extends Controller
 {
-    public function __construct()
+    use ResponseTrait;
+
+    protected SupportTicketInterface $supportTicketRepository;
+
+    public function __construct(SupportTicketInterface $supportTicketRepository)
     {
-        $this->middleware('auth:sanctum')->except(['store']);
+        $this->supportTicketRepository = $supportTicketRepository;
     }
 
     public function index(Request $request)
     {
-        // ✅ أضفنا withCount('replies')
-        $query = SupportTicket::with(['user', 'replies'])->withCount('replies');
+        $result = $this->supportTicketRepository->index($request);
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->filled('priority')) {
-            $query->where('priority', $request->priority);
-        }
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('ticket_number', 'like', "%{$search}%")
-                    ->orWhere('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('subject', 'like', "%{$search}%");
-            });
-        }
-
-        $tickets = $query->orderBy('created_at', 'desc')
-            ->paginate($request->per_page ?? 10);
-
-        return response()->json([
-            'data' => $tickets->items(),
-            'meta' => [
-                'current_page' => $tickets->currentPage(),
-                'last_page'    => $tickets->lastPage(),
-                'per_page'     => $tickets->perPage(),
-                'total'        => $tickets->total(),
-            ]
-        ]);
-    }
-
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|max:255',
-            'subject'  => 'required|string|max:255',
-            'message'  => 'required|string',
-            'priority' => 'nullable|in:low,medium,high',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'بيانات غير صحيحة',
-                'errors'  => $validator->errors()
-            ], 422);
-        }
-
-        $ticket = SupportTicket::create([
-            'ticket_number' => 'TKT-' . strtoupper(uniqid()),
-            'user_id'       => auth('sanctum')->id(),
-            'name'          => $request->name,
-            'email'         => $request->email,
-            'subject'       => $request->subject,
-            'message'       => $request->message,
-            'priority'      => $request->priority ?? 'medium',
-            'status'        => 'open',
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'تم إنشاء التذكرة بنجاح',
-            'ticket'  => $ticket
-        ], 201);
+        return $result['status']
+            ? $this->successResponse($result['message'], $result['data'])
+            : $this->failureResponse($result['message']);
     }
 
     public function show($id)
     {
-        $ticket = SupportTicket::with(['replies.user'])->findOrFail($id);
-        return response()->json($ticket);
+        $result = $this->supportTicketRepository->show($id);
+
+        return $result['status']
+            ? $this->successResponse($result['message'], $result['data'])
+            : $this->failureResponse($result['message'], null, 404);
     }
 
-    public function reply(Request $request, $id)
+    public function store(StoreSupportTicketRequest $request)
     {
-        $request->validate(['message' => 'required|string']);
+        $result = $this->supportTicketRepository->store($request);
 
-        $ticket = SupportTicket::findOrFail($id);
-
-        $reply = SupportTicketReply::create([
-            'ticket_id'      => $id,
-            'user_id'        => auth('sanctum')->id(),
-            'message'        => $request->message,
-            'is_admin_reply' => auth('sanctum')->user()?->isAdmin() ?? false,
-        ]);
-
-        if ($ticket->status === 'closed') {
-            $ticket->status = 'in_progress';
-            $ticket->save();
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'تم إضافة الرد بنجاح',
-            'reply'   => $reply,
-            'replies' => $ticket->replies()->with('user')->get(),
-            'status'  => $ticket->status
-        ]);
+        return $result['status']
+            ? $this->successResponse($result['message'], $result['data'], 201)
+            : $this->failureResponse($result['message']);
     }
 
-    public function close($id)
+    public function reply(ReplySupportTicketRequest $request, SupportTicket $ticket)
     {
-        $ticket = SupportTicket::findOrFail($id);
-        $ticket->status = 'closed';
-        $ticket->save();
+        $result = $this->supportTicketRepository->reply($request, $ticket);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'تم إغلاق التذكرة',
-            'ticket'  => $ticket
-        ]);
+        return $result['status']
+            ? $this->successResponse($result['message'], $result['data'])
+            : $this->failureResponse($result['message']);
     }
 
-    public function destroy($id)
+    public function updateStatus(UpdateSupportTicketStatusRequest $request, SupportTicket $ticket)
     {
-        $ticket = SupportTicket::findOrFail($id);
-        $ticket->replies()->delete();
-        $ticket->delete();
+        $result = $this->supportTicketRepository->updateStatus($request, $ticket);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'تم حذف التذكرة'
-        ]);
+        return $result['status']
+            ? $this->successResponse($result['message'], $result['data'])
+            : $this->failureResponse($result['message']);
     }
 
-    public function updateStatus(Request $request, $id)
+    // ✅ close() أصبحت تستدعي نفس منطق updateStatus بدل تكرار الكود —
+    //    هذا يحل التضارب القديم بين "إغلاق سريع" و"تغيير الحالة لـ closed"
+    public function close(SupportTicket $ticket)
     {
-        $request->validate(['status' => 'required|in:open,in_progress,closed']);
+        $result = $this->supportTicketRepository->updateStatus(
+            new Request(['status' => 'closed']),
+            $ticket
+        );
 
-        $ticket = SupportTicket::findOrFail($id);
-        $oldStatus = $ticket->status;
-        $ticket->status = $request->status;
-        $ticket->save();
+        return $result['status']
+            ? $this->successResponse($result['message'], $result['data'])
+            : $this->failureResponse($result['message']);
+    }
 
-        if ($request->status === 'closed' && $oldStatus !== 'closed') {
-            SupportTicketReply::create([
-                'ticket_id'      => $id,
-                'user_id'        => auth('sanctum')->id(),
-                'message'        => 'تم إغلاق التذكرة من قبل الإدارة.',
-                'is_admin_reply' => true,
-            ]);
-        }
+    public function destroy(SupportTicket $ticket)
+    {
+        $result = $this->supportTicketRepository->destroy($ticket);
 
-        if ($oldStatus === 'closed' && in_array($request->status, ['open', 'in_progress'])) {
-            SupportTicketReply::create([
-                'ticket_id'      => $id,
-                'user_id'        => auth('sanctum')->id(),
-                'message'        => 'تم إعادة فتح التذكرة.',
-                'is_admin_reply' => true,
-            ]);
-        }
+        return $result['status']
+            ? $this->successResponse($result['message'], $result['data'])
+            : $this->failureResponse($result['message']);
+    }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'تم تحديث الحالة',
-            'data'    => $ticket->load(['replies.user']),
-        ]);
+
+
+    public function track(TrackSupportTicketRequest $request)
+    {
+        $result = $this->supportTicketRepository->track($request);
+        return $result['status']
+            ? $this->successResponse($result['message'], $result['data'])
+            : $this->failureResponse($result['message'], null, 404);
+    }
+
+    public function assign(AssignSupportTicketRequest $request, SupportTicket $ticket)
+    {
+        $result = $this->supportTicketRepository->assign($request, $ticket);
+        return $result['status']
+            ? $this->successResponse($result['message'], $result['data'])
+            : $this->failureResponse($result['message']);
     }
 }

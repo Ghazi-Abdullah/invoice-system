@@ -15,7 +15,7 @@ class ReportRepository implements ReportInterface
     {
         try {
             $query = Invoice::with([
-                // ✅ select فقط الحقول المطلوبة من العلاقات
+                // select فقط الحقول المطلوبة من العلاقات
                 'client:id,name,email,company_name',
                 'items:id,invoice_id,description,quantity,unit_price,total',
             ])
@@ -24,17 +24,17 @@ class ReportRepository implements ReportInterface
                 ->when(!empty($filters['status']),     fn($q) => $q->where('status', $filters['status']))
                 ->when(!empty($filters['client_id']),  fn($q) => $q->where('client_id', (int) $filters['client_id']))
                 ->when(!empty($filters['user_id']),    fn($q) => $q->where('user_id', (int) $filters['user_id']))
+                ->when(!empty($filters['branch_id']),  fn($q) => $q->where('branch_id', (int) $filters['branch_id']))
                 ->orderBy('invoice_date', 'desc');
 
             $perPage  = min((int) ($filters['per_page'] ?? 20), 100);
             $invoices = $query->paginate($perPage);
 
-            // ✅ الإحصائيات بـ query منفصل على DB مباشرة — لا تحسبها على الـ collection
-            // لأن $invoices->sum() يعمل فقط على الصفحة الحالية
             $statsQuery = Invoice::when(!empty($filters['start_date']), fn($q) => $q->whereDate('invoice_date', '>=', $filters['start_date']))
                 ->when(!empty($filters['end_date']),   fn($q) => $q->whereDate('invoice_date', '<=', $filters['end_date']))
                 ->when(!empty($filters['status']),     fn($q) => $q->where('status', $filters['status']))
                 ->when(!empty($filters['client_id']),  fn($q) => $q->where('client_id', (int) $filters['client_id']))
+                ->when(!empty($filters['branch_id']),  fn($q) => $q->where('branch_id', (int) $filters['branch_id']))
                 ->selectRaw('
                     COUNT(*) as total_invoices,
                     SUM(total) as total_amount,
@@ -73,28 +73,29 @@ class ReportRepository implements ReportInterface
     public function getClientReport(array $filters = []): array
     {
         try {
-            // ✅ كل الإحصائيات في query واحد بـ withCount + withSum
             $query = Client::withCount(['invoices' => function ($q) use ($filters) {
-                    $this->applyDateFilters($q, $filters);
-                }])
+                $this->applyDateFilters($q, $filters);
+                $this->applyBranchFilter($q, $filters);
+            }])
                 ->withSum(['invoices as invoices_sum_total' => function ($q) use ($filters) {
                     $this->applyDateFilters($q, $filters);
+                    $this->applyBranchFilter($q, $filters);
                 }], 'total')
                 ->withSum(['invoices as paid_sum' => function ($q) use ($filters) {
                     $this->applyDateFilters($q, $filters);
+                    $this->applyBranchFilter($q, $filters);
                     $q->where('status', Constants::INVOICE_STATUS_PAID);
                 }], 'total')
+                ->when(!empty($filters['branch_id']), fn($q) => $q->where('branch_id', (int) $filters['branch_id']))
                 ->orderBy('invoices_count', 'desc');
 
             if (!empty($filters['client_id'])) {
                 $query->where('id', (int) $filters['client_id']);
             }
 
-            // ✅ paginate بدل get() لمنع تحميل كل العملاء دفعة واحدة
             $perPage = min((int) ($filters['per_page'] ?? 20), 100);
             $clients = $query->paginate($perPage);
 
-            // ✅ الإحصائيات من الـ collection بدون queries إضافية
             $collection    = $clients->getCollection();
             $totalRevenue  = $collection->sum('invoices_sum_total');
             $activeClients = $collection->where('invoices_count', '>', 0)->count();
@@ -141,7 +142,6 @@ class ReportRepository implements ReportInterface
     public function getRevenueReport(array $filters = []): array
     {
         try {
-            // ✅ استخدام bindings بدل string interpolation لمنع SQL Injection
             $revenueData = Invoice::select(
                 DB::raw('DATE_FORMAT(invoice_date, "%Y-%m") as month'),
                 DB::raw('COUNT(*) as invoice_count'),
@@ -152,6 +152,7 @@ class ReportRepository implements ReportInterface
                 ->when(!empty($filters['start_date']), fn($q) => $q->whereDate('invoice_date', '>=', $filters['start_date']))
                 ->when(!empty($filters['end_date']),   fn($q) => $q->whereDate('invoice_date', '<=', $filters['end_date']))
                 ->when(!empty($filters['status']),     fn($q) => $q->where('status', $filters['status']))
+                ->when(!empty($filters['branch_id']),  fn($q) => $q->where('branch_id', (int) $filters['branch_id']))
                 ->groupBy('month')
                 ->orderBy('month', 'desc')
                 ->get();
@@ -185,11 +186,15 @@ class ReportRepository implements ReportInterface
     public function getOverdueReport(array $filters = []): array
     {
         try {
-            // ✅ select فقط الحقول المطلوبة + client:id,name فقط
             $overdueInvoices = Invoice::select([
-                    'id', 'invoice_number', 'client_id',
-                    'due_date', 'total', 'status', 'currency',
-                ])
+                'id',
+                'invoice_number',
+                'client_id',
+                'due_date',
+                'total',
+                'status',
+                'currency',
+            ])
                 ->with('client:id,name,email')
                 ->where(function ($q) {
                     $q->where('status', Constants::INVOICE_STATUS_OVERDUE)
@@ -200,10 +205,10 @@ class ReportRepository implements ReportInterface
                 })
                 ->when(!empty($filters['start_date']), fn($q) => $q->whereDate('invoice_date', '>=', $filters['start_date']))
                 ->when(!empty($filters['end_date']),   fn($q) => $q->whereDate('invoice_date', '<=', $filters['end_date']))
+                ->when(!empty($filters['branch_id']),  fn($q) => $q->where('branch_id', (int) $filters['branch_id']))
                 ->orderBy('due_date', 'asc')
                 ->get();
 
-            // ✅ حساب days_overdue في PHP بدل query إضافي
             $now   = now();
             $items = $overdueInvoices->map(function ($invoice) use ($now) {
                 $daysOverdue = max(0, $now->diffInDays($invoice->due_date));
@@ -241,11 +246,90 @@ class ReportRepository implements ReportInterface
         }
     }
 
-    public function getDashboardStats(): array
+    public function getAgingReport(array $filters = []): array
     {
         try {
-            // ✅ query واحد بدل 7 queries منفصلة
-            $invoiceStats = Invoice::selectRaw('
+            // نفس معيار "المتأخر" المستخدم بالضبط في getOverdueReport()
+            $overdueInvoices = Invoice::select([
+                'id',
+                'invoice_number',
+                'client_id',
+                'due_date',
+                'total',
+                'status',
+                'currency',
+            ])
+                ->with('client:id,name,email')
+                ->where(function ($q) {
+                    $q->where('status', Constants::INVOICE_STATUS_OVERDUE)
+                        ->orWhere(function ($sub) {
+                            $sub->where('status', Constants::INVOICE_STATUS_SENT)
+                                ->whereDate('due_date', '<', now());
+                        });
+                })
+                ->when(!empty($filters['client_id']), fn($q) => $q->where('client_id', (int) $filters['client_id']))
+                ->when(!empty($filters['branch_id']), fn($q) => $q->where('branch_id', (int) $filters['branch_id']))
+                ->orderBy('due_date', 'asc')
+                ->get();
+
+            $now        = now();
+            $buckets    = ['0_30' => 0, '31_60' => 0, '61_90' => 0, '90_plus' => 0];
+            $clientsMap = [];
+
+            foreach ($overdueInvoices as $invoice) {
+                $daysOverdue = max(0, $now->diffInDays($invoice->due_date));
+                $bucketKey   = $this->getAgingBucketKey($daysOverdue);
+                $amount      = (float) $invoice->total;
+                $clientId    = $invoice->client_id;
+
+                if (!isset($clientsMap[$clientId])) {
+                    $clientsMap[$clientId] = [
+                        'client_id'      => $clientId,
+                        'client_name'    => $invoice->client->name  ?? 'غير محدد',
+                        'client_email'   => $invoice->client->email ?? null,
+                        'bucket_0_30'    => 0,
+                        'bucket_31_60'   => 0,
+                        'bucket_61_90'   => 0,
+                        'bucket_90_plus' => 0,
+                        'total_due'      => 0,
+                        'invoices_count' => 0,
+                    ];
+                }
+
+                $clientsMap[$clientId]['bucket_' . $bucketKey] += $amount;
+                $clientsMap[$clientId]['total_due']            += $amount;
+                $clientsMap[$clientId]['invoices_count']       += 1;
+
+                $buckets[$bucketKey] += $amount;
+            }
+
+            // ترتيب حسب أعلى مديونية أولاً
+            $items = collect(array_values($clientsMap))
+                ->sortByDesc('total_due')
+                ->values();
+
+            return [
+                'items' => $items,
+                'stats' => [
+                    'total_clients'        => $items->count(),
+                    'total_due'            => (float) array_sum($buckets),
+                    'bucket_0_30_total'    => (float) $buckets['0_30'],
+                    'bucket_31_60_total'   => (float) $buckets['31_60'],
+                    'bucket_61_90_total'   => (float) $buckets['61_90'],
+                    'bucket_90_plus_total' => (float) $buckets['90_plus'],
+                ],
+            ];
+        } catch (\Exception $e) {
+            Log::error('ReportRepository getAgingReport error', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    public function getDashboardStats(?int $branchId = null): array
+    {
+        try {
+            $invoiceStats = Invoice::when($branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->selectRaw('
                 COUNT(*) as total_invoices,
                 SUM(total) as total_amount,
                 SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as paid_invoices,
@@ -266,7 +350,7 @@ class ReportRepository implements ReportInterface
                 'paid_amount'      => (float)  ($invoiceStats->paid_amount      ?? 0),
                 'overdue_invoices' => (int)   ($invoiceStats->overdue_invoices ?? 0),
                 'overdue_amount'   => (float)  ($invoiceStats->overdue_amount   ?? 0),
-                'total_clients'    => Client::count(),
+                'total_clients'    => Client::when($branchId, fn($q) => $q->where('branch_id', $branchId))->count(),
             ];
         } catch (\Exception $e) {
             Log::error('ReportRepository getDashboardStats error', ['error' => $e->getMessage()]);
@@ -287,7 +371,6 @@ class ReportRepository implements ReportInterface
 
     public function sendInvoiceReminder(int $invoiceId): array
     {
-        // ✅ select فقط ما يحتاجه
         $invoice = Invoice::with('client:id,name,email')->findOrFail($invoiceId);
 
         return [
@@ -356,5 +439,27 @@ class ReportRepository implements ReportInterface
         if (!empty($filters['end_date'])) {
             $query->whereDate('invoice_date', '<=', $filters['end_date']);
         }
+    }
+
+    /**
+     * ✅ إضافة: فلترة حسب الفرع - تستخدم داخل الـ closures المتداخلة
+     * (withCount/withSum) بنفس طريقة applyDateFilters()
+     */
+    private function applyBranchFilter($query, array $filters): void
+    {
+        if (!empty($filters['branch_id'])) {
+            $query->where('branch_id', (int) $filters['branch_id']);
+        }
+    }
+
+    /**
+     * تصنيف عدد أيام التأخير إلى فئة عمرية
+     */
+    private function getAgingBucketKey(int $daysOverdue): string
+    {
+        if ($daysOverdue <= 30) return '0_30';
+        if ($daysOverdue <= 60) return '31_60';
+        if ($daysOverdue <= 90) return '61_90';
+        return '90_plus';
     }
 }

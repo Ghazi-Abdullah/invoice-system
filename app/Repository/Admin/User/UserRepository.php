@@ -15,7 +15,7 @@ class UserRepository implements UserInterface
     public function index($request)
     {
         try {
-            $query = User::with('adminGroup')
+            $query = User::with(['adminGroup', 'branches'])
                 ->orderBy('created_at', 'desc');
 
             // Apply filters
@@ -61,7 +61,7 @@ class UserRepository implements UserInterface
     public function show($id)
     {
         try {
-            $user = User::with(['adminGroup'])->find($id);
+            $user = User::with(['adminGroup', 'branches'])->find($id);
 
             if (!$user) {
                 return [
@@ -230,16 +230,16 @@ class UserRepository implements UserInterface
             $userName = $user->name;
             $userId = $user->id;
 
-            // التحقق من وجود فواتير مرتبطة بالمستخدم
-            // استخدم created_by بدلاً من user_id إذا لم يكن موجوداً
+            // Ø§Ù„ØªØ­Ù‚Ù‚ Ù…Ù† ÙˆØ¬ÙˆØ¯ ÙÙˆØ§ØªÙŠØ± Ù…Ø±ØªØ¨Ø·Ø© Ø¨Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…
+            // Ø§Ø³ØªØ®Ø¯Ù… created_by Ø¨Ø¯Ù„Ø§Ù‹ Ù…Ù† user_id Ø¥Ø°Ø§ Ù„Ù… ÙŠÙƒÙ† Ù…ÙˆØ¬ÙˆØ¯Ø§Ù‹
             $hasInvoices = false;
 
-            // تحقق أولاً إذا كان عمود user_id موجود في جدول invoices
+            // ØªØ­Ù‚Ù‚ Ø£ÙˆÙ„Ø§Ù‹ Ø¥Ø°Ø§ ÙƒØ§Ù† Ø¹Ù…ÙˆØ¯ user_id Ù…ÙˆØ¬ÙˆØ¯ ÙÙŠ Ø¬Ø¯ÙˆÙ„ invoices
             if (Schema::hasColumn('invoices', 'user_id')) {
-                // استخدم user_id إذا كان موجوداً
+                // Ø§Ø³ØªØ®Ø¯Ù… user_id Ø¥Ø°Ø§ ÙƒØ§Ù† Ù…ÙˆØ¬ÙˆØ¯Ø§Ù‹
                 $hasInvoices = Invoice::where('user_id', $user->id)->exists();
             } else {
-                // استخدم created_by إذا لم يكن user_id موجوداً
+                // Ø§Ø³ØªØ®Ø¯Ù… created_by Ø¥Ø°Ø§ Ù„Ù… ÙŠÙƒÙ† user_id Ù…ÙˆØ¬ÙˆØ¯Ø§Ù‹
                 $hasInvoices = Invoice::where('created_by', $user->id)->exists();
             }
 
@@ -251,9 +251,9 @@ class UserRepository implements UserInterface
                 ];
             }
 
-            // تحقق من وجود أنشطة مرتبطة بالمستخدم
+            // ØªØ­Ù‚Ù‚ Ù…Ù† ÙˆØ¬ÙˆØ¯ Ø£Ù†Ø´Ø·Ø© Ù…Ø±ØªØ¨Ø·Ø© Ø¨Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…
             if ($user->activities()->count() > 0) {
-                // يمكنك حذف الأنشطة أولاً أو منع الحذف
+                // ÙŠÙ…ÙƒÙ†Ùƒ Ø­Ø°Ù Ø§Ù„Ø£Ù†Ø´Ø·Ø© Ø£ÙˆÙ„Ø§Ù‹ Ø£Ùˆ Ù…Ù†Ø¹ Ø§Ù„Ø­Ø°Ù
                 $user->activities()->delete();
             }
 
@@ -424,7 +424,7 @@ class UserRepository implements UserInterface
     public function getStaffUsers()
     {
         try {
-            $staff = User::with(['adminGroup'])
+            $staff = User::with(['adminGroup', 'branches'])
                 ->whereIn('admin_group_id', [Constants::SUPER_ADMIN_GROUP_ID, Constants::ADMIN_GROUP_ID])
                 ->where('is_active', true)
                 ->get();
@@ -447,7 +447,7 @@ class UserRepository implements UserInterface
     public function getClientUsers()
     {
         try {
-            $clients = User::with(['adminGroup'])
+            $clients = User::with(['adminGroup', 'branches'])
                 ->where('admin_group_id', Constants::CLIENT_GROUP_ID)
                 ->where('is_active', true)
                 ->get();

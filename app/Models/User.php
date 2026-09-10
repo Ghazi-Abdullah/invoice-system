@@ -96,6 +96,23 @@ class User extends Authenticatable
         return $this->hasMany(ActivityLog::class, 'user_id');
     }
 
+    // ✅ جديد: علاقة المستخدم بالفروع (Many-to-Many)
+    public function branches()
+    {
+        return $this->belongsToMany(Branch::class, 'user_branches')
+            ->withPivot('is_default')
+            ->withTimestamps();
+    }
+
+    // ✅ جديد: الفرع الافتراضي للمستخدم
+    public function defaultBranch()
+    {
+        return $this->belongsToMany(Branch::class, 'user_branches')
+            ->wherePivot('is_default', true)
+            ->withPivot('is_default')
+            ->withTimestamps();
+    }
+
     // ── Methods ──────────────────────────────────────────────
     public function isSuperAdmin(): bool
     {
@@ -129,7 +146,13 @@ class User extends Authenticatable
             ->exists();
     }
 
-    /**
-     * ✅ حذفنا can() — لا تعيد تعريفها، تكسر Laravel Policies
-     */
+    // ✅ جديد: هل لدى المستخدم صلاحية لهذا الفرع؟
+    public function hasBranchAccess(int $branchId): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return $this->branches()->where('branch_id', $branchId)->exists();
+    }
 }

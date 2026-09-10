@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 
 Illuminate\Support\Facades\Schedule::command('installments:mark-overdue')->dailyAt('00:05');
 Illuminate\Support\Facades\Schedule::command('invoices:check-due-dates')->dailyAt('08:00');
+Illuminate\Support\Facades\Schedule::command('invoices:generate-recurring')->dailyAt('06:00');

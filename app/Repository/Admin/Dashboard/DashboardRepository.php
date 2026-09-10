@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 
 class DashboardRepository implements DashboardInterface
 {
-    public function getDashboardData(User $user): array
+    public function getDashboardData(User $user, ?int $branchId = null): array
     {
         try {
             $today = Carbon::today();
@@ -20,15 +20,15 @@ class DashboardRepository implements DashboardInterface
             $sixMonthsAgo = Carbon::now()->subMonths(6)->startOfMonth();
 
             // إحصائيات كاملة
-            $stats = $this->getCompleteStats($today, $currentMonth, $lastMonth);
+            $stats = $this->getCompleteStats($today, $currentMonth, $lastMonth, $branchId);
 
             // البيانات الحديثة
-            $recentClients = $this->getRecentClients(5);
-            $recentInvoices = $this->getRecentInvoices(5);
-            $monthlyRevenue = $this->getMonthlyRevenue($sixMonthsAgo);
-            $overdueInvoices = $this->getOverdueInvoices();
-            $recentActivity = $this->getRecentActivity(10);
-            $topClients = $this->getTopClients(5);
+            $recentClients = $this->getRecentClients(5, $branchId);
+            $recentInvoices = $this->getRecentInvoices(5, $branchId);
+            $monthlyRevenue = $this->getMonthlyRevenue($sixMonthsAgo, $branchId);
+            $overdueInvoices = $this->getOverdueInvoices($branchId);
+            $recentActivity = $this->getRecentActivity(10, $branchId);
+            $topClients = $this->getTopClients(5, $branchId);
 
             // توزيع حالة الفواتير
             $invoiceStatuses = [
@@ -71,7 +71,7 @@ class DashboardRepository implements DashboardInterface
             ];
 
             // بيانات الأداء الشهري للرسم البياني
-            $performanceData = $this->getPerformanceData($sixMonthsAgo);
+            $performanceData = $this->getPerformanceData($sixMonthsAgo, $branchId);
 
             return [
                 'stats' => $stats,
@@ -101,19 +101,23 @@ class DashboardRepository implements DashboardInterface
         }
     }
 
-    private function getCompleteStats($today, $currentMonth, $lastMonth)
+    private function getCompleteStats($today, $currentMonth, $lastMonth, ?int $branchId = null)
     {
         // إجمالي الإيرادات
-        $totalRevenue = (float) Invoice::where('status', 'paid')->sum('total');
+        $totalRevenue = (float) Invoice::where('status', 'paid')
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->sum('total');
 
         // إيرادات هذا الشهر
         $currentMonthRevenue = (float) Invoice::where('status', 'paid')
             ->whereBetween('paid_at', [$currentMonth, Carbon::now()])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->sum('total');
 
         // إيرادات الشهر الماضي
         $lastMonthRevenue = (float) Invoice::where('status', 'paid')
             ->whereBetween('paid_at', [$lastMonth, $currentMonth])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->sum('total');
 
         // نمو الإيرادات
@@ -122,13 +126,17 @@ class DashboardRepository implements DashboardInterface
             ($currentMonthRevenue > 0 ? 100 : 0);
 
         // إجمالي الفواتير
-        $totalInvoices = Invoice::count();
+        $totalInvoices = Invoice::when($branchId, fn($q) => $q->where('branch_id', $branchId))->count();
 
         // فواتير هذا الشهر
-        $currentMonthInvoices = Invoice::whereBetween('created_at', [$currentMonth, Carbon::now()])->count();
+        $currentMonthInvoices = Invoice::whereBetween('created_at', [$currentMonth, Carbon::now()])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->count();
 
         // فواتير الشهر الماضي
-        $lastMonthInvoices = Invoice::whereBetween('created_at', [$lastMonth, $currentMonth])->count();
+        $lastMonthInvoices = Invoice::whereBetween('created_at', [$lastMonth, $currentMonth])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->count();
 
         // نمو الفواتير
         $invoiceGrowth = $lastMonthInvoices > 0 ?
@@ -136,13 +144,17 @@ class DashboardRepository implements DashboardInterface
             ($currentMonthInvoices > 0 ? 100 : 0);
 
         // إجمالي العملاء
-        $totalClients = Client::count();
+        $totalClients = Client::when($branchId, fn($q) => $q->where('branch_id', $branchId))->count();
 
         // عملاء هذا الشهر
-        $currentMonthClients = Client::whereBetween('created_at', [$currentMonth, Carbon::now()])->count();
+        $currentMonthClients = Client::whereBetween('created_at', [$currentMonth, Carbon::now()])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->count();
 
         // عملاء الشهر الماضي
-        $lastMonthClients = Client::whereBetween('created_at', [$lastMonth, $currentMonth])->count();
+        $lastMonthClients = Client::whereBetween('created_at', [$lastMonth, $currentMonth])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->count();
 
         // نمو العملاء
         $clientsGrowth = $lastMonthClients > 0 ?
@@ -150,22 +162,23 @@ class DashboardRepository implements DashboardInterface
             ($currentMonthClients > 0 ? 100 : 0);
 
         // الفواتير حسب الحالة
-        $paidInvoices = Invoice::where('status', 'paid')->count();
-        $pendingInvoices = Invoice::where('status', 'sent')->count();
-        $overdueInvoices = Invoice::where('status', 'overdue')->count();
-        $draftInvoices = Invoice::where('status', 'draft')->count();
+        $paidInvoices = Invoice::where('status', 'paid')->when($branchId, fn($q) => $q->where('branch_id', $branchId))->count();
+        $pendingInvoices = Invoice::where('status', 'sent')->when($branchId, fn($q) => $q->where('branch_id', $branchId))->count();
+        $overdueInvoices = Invoice::where('status', 'overdue')->when($branchId, fn($q) => $q->where('branch_id', $branchId))->count();
+        $draftInvoices = Invoice::where('status', 'draft')->when($branchId, fn($q) => $q->where('branch_id', $branchId))->count();
 
         // المبالغ حسب الحالة
-        $paidAmount = (float) Invoice::where('status', 'paid')->sum('total');
-        $pendingAmount = (float) Invoice::where('status', 'sent')->sum('total');
-        $overdueAmount = (float) Invoice::where('status', 'overdue')->sum('total');
-        $draftAmount = (float) Invoice::where('status', 'draft')->sum('total');
+        $paidAmount = (float) Invoice::where('status', 'paid')->when($branchId, fn($q) => $q->where('branch_id', $branchId))->sum('total');
+        $pendingAmount = (float) Invoice::where('status', 'sent')->when($branchId, fn($q) => $q->where('branch_id', $branchId))->sum('total');
+        $overdueAmount = (float) Invoice::where('status', 'overdue')->when($branchId, fn($q) => $q->where('branch_id', $branchId))->sum('total');
+        $draftAmount = (float) Invoice::where('status', 'draft')->when($branchId, fn($q) => $q->where('branch_id', $branchId))->sum('total');
 
         // معدل الدفع
         $paymentRate = $totalInvoices > 0 ? ($paidInvoices / $totalInvoices) * 100 : 0;
 
         // متوسط الإيرادات الشهرية
         $avgResult = Invoice::where('status', 'paid')
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->select(DB::raw('AVG(total) as avg_revenue'))
             ->first();
         $avgMonthlyRevenue = $avgResult ? (float) $avgResult->avg_revenue : 0;
@@ -173,9 +186,12 @@ class DashboardRepository implements DashboardInterface
         // إحصائيات اليوم
         $todayPaidInvoices = Invoice::where('status', 'paid')
             ->whereDate('paid_at', $today)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->count();
 
-        $todayTotalInvoices = Invoice::whereDate('created_at', $today)->count();
+        $todayTotalInvoices = Invoice::whereDate('created_at', $today)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->count();
 
         return [
             'totalRevenue' => $totalRevenue,
@@ -202,21 +218,25 @@ class DashboardRepository implements DashboardInterface
         ];
     }
 
-    private function getRecentClients($limit = 5)
+    private function getRecentClients($limit = 5, ?int $branchId = null)
     {
-        $clientGrowth = $this->getClientGrowthRates();
+        $clientGrowth = $this->getClientGrowthRates($branchId);
 
-        return Client::latest()
+        return Client::when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->latest()
             ->take($limit)
             ->get()
-            ->map(function ($client) use ($clientGrowth) {
+            ->map(function ($client) use ($clientGrowth, $branchId) {
                 // حساب إجمالي الإنفاق
                 $totalSpent = Invoice::where('client_id', $client->id)
                     ->where('status', 'paid')
+                    ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
                     ->sum('total');
 
                 // حساب إجمالي الفواتير
-                $totalInvoices = Invoice::where('client_id', $client->id)->count();
+                $totalInvoices = Invoice::where('client_id', $client->id)
+                    ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+                    ->count();
 
                 return [
                     'id' => $client->id,
@@ -240,19 +260,21 @@ class DashboardRepository implements DashboardInterface
      *
      * @return array<int, float> [client_id => نسبة النمو]
      */
-    private function getClientGrowthRates(): array
+    private function getClientGrowthRates(?int $branchId = null): array
     {
         $currentMonthStart = Carbon::now()->startOfMonth();
         $lastMonthStart = Carbon::now()->subMonth()->startOfMonth();
 
         $currentMonthByClient = Invoice::where('status', 'paid')
             ->where('paid_at', '>=', $currentMonthStart)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->select('client_id', DB::raw('SUM(total) as total'))
             ->groupBy('client_id')
             ->pluck('total', 'client_id');
 
         $lastMonthByClient = Invoice::where('status', 'paid')
             ->whereBetween('paid_at', [$lastMonthStart, $currentMonthStart])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->select('client_id', DB::raw('SUM(total) as total'))
             ->groupBy('client_id')
             ->pluck('total', 'client_id');
@@ -272,9 +294,10 @@ class DashboardRepository implements DashboardInterface
         return $growthRates;
     }
 
-    private function getRecentInvoices($limit = 5)
+    private function getRecentInvoices($limit = 5, ?int $branchId = null)
     {
         return Invoice::with('client')
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->latest()
             ->take($limit)
             ->get()
@@ -294,10 +317,11 @@ class DashboardRepository implements DashboardInterface
             })->toArray();
     }
 
-    private function getMonthlyRevenue($startDate)
+    private function getMonthlyRevenue($startDate, ?int $branchId = null)
     {
         $revenues = Invoice::where('status', 'paid')
             ->where('paid_at', '>=', $startDate)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->select(
                 DB::raw('DATE_FORMAT(paid_at, "%Y-%m") as month'),
                 DB::raw('SUM(total) as revenue'),
@@ -327,9 +351,10 @@ class DashboardRepository implements DashboardInterface
         })->toArray();
     }
 
-    private function getOverdueInvoices()
+    private function getOverdueInvoices(?int $branchId = null)
     {
         return Invoice::where('status', 'overdue')
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->with('client')
             ->latest()
             ->get()
@@ -349,10 +374,11 @@ class DashboardRepository implements DashboardInterface
             })->toArray();
     }
 
-    private function getRecentActivity($limit = 10)
+    private function getRecentActivity($limit = 10, ?int $branchId = null)
     {
         // نحاول جلب النشاط من سجلات الفواتير
         $recentInvoices = Invoice::with('client')
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->latest()
             ->take($limit)
             ->get();
@@ -376,6 +402,7 @@ class DashboardRepository implements DashboardInterface
 
         // إضافة نشاطات للفواتير المدفوعة
         $paidInvoices = Invoice::where('status', 'paid')
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->latest()
             ->take(3)
             ->get();
@@ -395,7 +422,10 @@ class DashboardRepository implements DashboardInterface
         }
 
         // إضافة نشاطات للعملاء الجدد
-        $recentClients = Client::latest()->take(2)->get();
+        $recentClients = Client::when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->latest()
+            ->take(2)
+            ->get();
         foreach ($recentClients as $client) {
             $activities[] = [
                 'id' => $counter++,
@@ -417,15 +447,16 @@ class DashboardRepository implements DashboardInterface
         return array_slice($activities, 0, $limit);
     }
 
-    private function getTopClients($limit = 5)
+    private function getTopClients($limit = 5, ?int $branchId = null)
     {
         // إجمالي المدفوع لكل عميل على مر الزمن
         $totalSpentByClient = Invoice::where('status', 'paid')
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->select('client_id', DB::raw('SUM(total) as total'))
             ->groupBy('client_id')
             ->pluck('total', 'client_id');
 
-        $clientGrowth = $this->getClientGrowthRates();
+        $clientGrowth = $this->getClientGrowthRates($branchId);
 
         return Client::whereIn('id', $totalSpentByClient->keys())
             ->get()
@@ -445,9 +476,10 @@ class DashboardRepository implements DashboardInterface
             ->toArray();
     }
 
-    private function getPerformanceData($startDate)
+    private function getPerformanceData($startDate, ?int $branchId = null)
     {
         $data = Invoice::where('paid_at', '>=', $startDate)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->select(
                 DB::raw('DATE_FORMAT(paid_at, "%Y-%m") as month'),
                 DB::raw('COUNT(*) as invoice_count'),
@@ -479,7 +511,6 @@ class DashboardRepository implements DashboardInterface
         }
 
         // إذا لم يكن هناك بيانات فعلية، نعرض آخر 6 أشهر بقيمة صفر حقيقية
-        // (بدل بيانات عشوائية كانت تُظهر إيرادات وهمية لمنشأة جديدة بلا مبيعات بعد)
         if (empty($result['months'])) {
             for ($i = 5; $i >= 0; $i--) {
                 $date = Carbon::now()->subMonths($i);
@@ -522,7 +553,6 @@ class DashboardRepository implements DashboardInterface
         for ($i = 5; $i >= 0; $i--) {
             $date = Carbon::now()->subMonths($i);
             $performanceData['months'][] = ($monthNames[$date->format('m')] ?? $date->format('m')) . ' ' . $date->format('Y');
-            // صفر حقيقي، مو أرقام وهمية قد يُخطئ أحد ويظنها بيانات فعلية
             $performanceData['invoices'][] = 0;
             $performanceData['revenues'][] = 0;
         }
@@ -605,7 +635,6 @@ class DashboardRepository implements DashboardInterface
                     ['label' => '1Y', 'value' => '1y'],
                 ]
             ],
-            // يوضّح للواجهة أن هذه بيانات احتياطية (فشل حقيقي في جلب البيانات) وليست بيانات حقيقية من قاعدة البيانات
             'is_fallback' => true,
         ];
     }

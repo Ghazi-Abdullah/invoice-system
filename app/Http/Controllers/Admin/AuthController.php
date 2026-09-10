@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\AdminPermission;
 use App\Models\OtpLog;
 use App\Constants\Constants;
+use App\Repository\Admin\Branch\BranchRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -32,6 +33,10 @@ class AuthController extends Controller
     private const OTP_COOLDOWN_SECONDS = 120;
     private const OTP_EXPIRY_MINUTES = 10;
 
+    public function __construct(
+        private BranchRepository $branchRepository
+    ) {}
+
     public function login(LoginRequest $request)
     {
         try {
@@ -43,7 +48,7 @@ class AuthController extends Controller
             if (Cache::has($lockKey)) {
                 $remaining = Cache::get($lockKey . '_remaining', self::LOCKOUT_MINUTES);
                 return $this->failureResponse(
-                    "تم قفل الحساب مؤقتاً. حاول بعد {$remaining} دقيقة.",
+                    "Too many login attempts. Please try again in {$remaining} minutes.",
                     null,
                     Constants::RESPONSE_TOO_MANY_REQUESTS
                 );
@@ -75,9 +80,6 @@ class AuthController extends Controller
 
             $this->clearFailedAttempts($ip, $email);
 
-            // ✅ خطوة تحقق ثانية إلزامية: لا يُصدر أي توكن هنا.
-            // بدل ذلك يُرسل رمز OTP، والتوكن يُصدر فقط من verifyOtp()
-            // بعد تأكيد امتلاك المستخدم لصندوق بريده الفعلي.
             $otpError = $this->attemptSendOtp($user, $request);
 
             if ($otpError) {
@@ -85,7 +87,7 @@ class AuthController extends Controller
             }
 
             return $this->successResponse(
-                'تم التحقق من بيانات الدخول، تم إرسال رمز التحقق إلى بريدك الإلكتروني',
+                'Login credentials verified. An OTP has been sent to your email.',
                 [
                     'requires_otp' => true,
                     'email'        => $user->email,
@@ -148,12 +150,18 @@ class AuthController extends Controller
             $permissions = $this->getUserPermissions($user);
             $is_admin = $user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID;
 
+            // ✅ جديد: جلب الفروع المسموح بها
+            $branches = $this->branchRepository->getUserBranches($user);
+            $defaultBranch = $this->branchRepository->getUserDefaultBranch($user);
+
             return $this->successResponse(
                 __('messages.user_fetched'),
                 [
-                    'user'        => $this->formatUser($user, $is_admin),
-                    'permissions' => $permissions,
-                    'is_admin'    => $is_admin,
+                    'user'           => $this->formatUser($user, $is_admin),
+                    'permissions'    => $permissions,
+                    'is_admin'       => $is_admin,
+                    'branches'       => $branches,
+                    'default_branch' => $defaultBranch?->id,
                 ]
             );
         } catch (\Exception $e) {
@@ -302,7 +310,6 @@ class AuthController extends Controller
             $email = strtolower(trim($request->email));
             $user = User::where('email', $email)->first();
 
-            // ✅ رسالة موحّدة سواء الحساب موجود أو لا — يمنع Enumeration
             if (!$user || !$user->is_active) {
                 return $this->successResponse(
                     'إذا كان البريد الإلكتروني مسجلاً، سيصلك رمز التحقق',
@@ -310,8 +317,6 @@ class AuthController extends Controller
                 );
             }
 
-            // ✅ يُستخدم الآن كـ "إعادة إرسال الرمز" فقط — الإرسال الأساسي
-            // يحصل تلقائياً من داخل login() كخطوة تحقق ثانية إلزامية
             $otpError = $this->attemptSendOtp($user, $request);
 
             if ($otpError) {
@@ -335,8 +340,6 @@ class AuthController extends Controller
     public function verifyOtp(VerifyOtpRequest $request): JsonResponse
     {
         try {
-            // ✅ التحقق بالبريد الإلكتروني بدل user_id (كان يُرسَل من
-            // الفرونت مباشرة بدون داعٍ — الباك الآن يبحث عن المستخدم بنفسه)
             $email = strtolower(trim($request->email));
             $user = User::with(['adminGroup.permissions'])->where('email', $email)->first();
 
@@ -388,7 +391,6 @@ class AuthController extends Controller
                 );
             }
 
-            // ✅ هذه هي اللحظة الوحيدة التي يُصدر فيها توكن الدخول فعلياً
             $user->update([
                 'otp'             => null,
                 'otp_via'         => null,
@@ -404,6 +406,10 @@ class AuthController extends Controller
             $permissions = $this->getUserPermissions($user);
             $is_admin = $user->admin_group_id == Constants::SUPER_ADMIN_GROUP_ID;
 
+            // ✅ جديد: جلب الفروع المسموح بها
+            $branches = $this->branchRepository->getUserBranches($user);
+            $defaultBranch = $this->branchRepository->getUserDefaultBranch($user);
+
             OtpLog::where('user_id', $user->id)
                 ->where('status', 'sent')
                 ->whereNull('verified_at')
@@ -414,11 +420,13 @@ class AuthController extends Controller
             return $this->successResponse(
                 __('messages.login_success'),
                 [
-                    'user'        => $this->formatUser($user, $is_admin),
-                    'token'       => $token,
-                    'token_type'  => 'Bearer',
-                    'permissions' => $permissions,
-                    'is_admin'    => $is_admin,
+                    'user'           => $this->formatUser($user, $is_admin),
+                    'token'          => $token,
+                    'token_type'     => 'Bearer',
+                    'permissions'    => $permissions,
+                    'is_admin'       => $is_admin,
+                    'branches'       => $branches,
+                    'default_branch' => $defaultBranch?->id,
                 ]
             );
         } catch (\Exception $e) {
@@ -431,17 +439,12 @@ class AuthController extends Controller
         }
     }
 
-    /**
-     * ✅ منطق إنشاء وإرسال OTP، مستخرَج بدالة واحدة مشتركة بين
-     * login() و sendOtp() لمنع ازدواجية الكود وتضارب السلوك بينهما.
-     * يرجع null عند النجاح، أو رسالة خطأ نصية لو ما زال الـ cooldown نشطاً.
-     */
     private function attemptSendOtp(User $user, Request $request): ?string
     {
         if ($user->otp_created_at && abs($user->otp_created_at->diffInSeconds(now())) < self::OTP_COOLDOWN_SECONDS) {
             $remaining = self::OTP_COOLDOWN_SECONDS - abs($user->otp_created_at->diffInSeconds(now()));
             $minutes = ceil($remaining / 60);
-            return "تم إرسال رمز مسبقاً، حاول بعد {$minutes} دقيقة";
+            return "{$minutes} minutes remaining before you can request a new OTP.";
         }
 
         $plainOtp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);

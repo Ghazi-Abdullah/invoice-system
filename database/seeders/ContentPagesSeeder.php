@@ -13,39 +13,39 @@ class ContentPagesSeeder extends Seeder
         ContentPage::create([
             'slug' => 'privacy-policy',
             'title' => 'Privacy Policy',
-            'introduction' => 'نحن نلتزم بحماية خصوصيتك وضمان أمان بياناتك الشخصية. توضح هذه السياسة كيفية جمعنا واستخدامنا وحمايتنا لمعلوماتك.',
+            'introduction' => 'we value your privacy and are committed to protecting your personal information. This policy explains how we collect, use, and safeguard your data.',
             'sections' => [
                 [
-                    'title' => 'المعلومات التي نجمعها',
+                    'title' => 'Information We Collect',
                     'content' => [
-                        'نقوم بجمع المعلومات التي تقدمها لنا مباشرة عند استخدامك لخدماتنا.',
-                        'كما نقوم بجمع معلومات تلقائية مثل عنوان IP ونوع المتصفح.',
+                        'We collect information you provide directly when using our services.',
+                        'We also collect automatic information such as IP address and browser type.',
                     ],
                     'items' => [
-                        'معلومات الحساب (الاسم، البريد الإلكتروني)',
-                        'معلومات الشركة',
-                        'بيانات الفواتير والمدفوعات',
-                        'سجل النشاط والاستخدام',
+                        'Account Information (Name, Email)',
+                        'Company Information',
+                        'Invoice and Payment Data',
+                        'Usage and Activity Logs',
                     ],
                 ],
                 [
-                    'title' => 'كيفية استخدام المعلومات',
+                    'title' => 'How We Use Information',
                     'content' => [
-                        'نستخدم معلوماتك لتقديم خدماتنا وتحسينها.',
-                        'لن نقوم ببيع أو مشاركة بياناتك مع أطراف ثالثة.',
+                        'We use your information to provide and improve our services.',
+                        'We will not sell or share your data with third parties.',
                     ],
                 ],
                 [
-                    'title' => 'حماية البيانات',
+                    'title' => 'Data Protection Measures',
                     'content' => [
-                        'نستخدم تقنيات تشفير متقدمة (SSL/TLS).',
-                        'نطبق إجراءات أمنية صارمة.',
+                        'We use advanced encryption technologies (SSL/TLS).',
+                        'We implement strict security procedures.',
                     ],
                     'items' => [
-                        'تشفير البيانات',
-                        'مصادقة ثنائية',
-                        'نسخ احتياطي منتظم',
-                        'مراقبة أمنية مستمرة',
+                        'Data Encryption',
+                        'Two-Factor Authentication',
+                        'Regular Backups',
+                        'Continuous Security Monitoring',
                     ],
                 ],
             ],
@@ -58,32 +58,32 @@ class ContentPagesSeeder extends Seeder
         ContentPage::create([
             'slug' => 'terms-of-service',
             'title' => 'Terms of Service',
-            'introduction' => 'باستخدامك لنظام الفواتير، فإنك توافق على الالتزام بهذه الشروط والأحكام.',
+            'introduction' => 'By using the invoicing system, you agree to be bound by these terms and conditions.',
             'sections' => [
                 [
-                    'title' => 'تعريفات',
+                    'title' => 'Definitions',
                     'content' => [
-                        '"النظام" يشير إلى منصة إدارة الفواتير.',
-                        '"المستخدم" يشير إلى أي شخص يستخدم النظام.',
+                        '"The System" refers to the invoicing management platform.',
+                        '"The User" refers to any person who uses the system.',
                     ],
                 ],
                 [
-                    'title' => 'استخدام الخدمة',
+                    'title' => 'Use of Service',
                     'content' => [
-                        'يجب أن يكون عمرك 18 عاماً على الأقل.',
-                        'أنت مسؤول عن سرية بيانات حسابك.',
+                        'You must be at least 18 years old to use the service.',
+                        'You are responsible for maintaining the confidentiality of your account information.',
                     ],
                     'sub_sections' => [
                         [
-                            'title' => 'قيود الاستخدام',
-                            'content' => 'ممنوع الوصول غير المصرح به أو إدخال برمجيات ضارة.',
+                            'title' => 'Usage Restrictions',
+                            'content' => 'Unauthorized access or insertion of malicious software is prohibited.',
                         ],
                     ],
                 ],
             ],
             'version' => '1.0',
             'effective_date' => '2024-01-01',
-            'acceptance_text' => 'باستخدامك للنظام، فإنك توافق على هذه الشروط.',
+            'acceptance_text' => 'By using the system, you agree to these terms and conditions.',
             'is_active' => true,
         ]);
     }

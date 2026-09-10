@@ -65,22 +65,23 @@ class InvoiceController extends Controller
         return response()->json($result, $result['status'] ? 200 : 500);
     }
 
-    public function dashboardStats()
+    public function dashboardStats(Request $request)
     {
-        $result = $this->invoiceRepository->getDashboardStats();
+        $result = $this->invoiceRepository->getDashboardStats($request->attributes->get('selected_branch_id'));
         return response()->json($result, $result['status'] ? 200 : 500);
     }
 
-    public function overdueInvoices()
+    public function overdueInvoices(Request $request)
     {
-        $result = $this->invoiceRepository->getOverdueInvoices();
+        $result = $this->invoiceRepository->getOverdueInvoices($request->attributes->get('selected_branch_id'));
         return response()->json($result, $result['status'] ? 200 : 500);
     }
 
     public function recentInvoices(Request $request)
     {
         $limit = $request->get('limit', 10);
-        $result = $this->invoiceRepository->getRecentInvoices($limit);
+        $branchId = $request->attributes->get('selected_branch_id');
+        $result = $this->invoiceRepository->getRecentInvoices($limit, $branchId);
         return response()->json($result, $result['status'] ? 200 : 500);
     }
 
@@ -174,13 +175,13 @@ class InvoiceController extends Controller
             if (!$plan) {
                 return response()->json([
                     'status'  => false,
-                    'message' => 'لا توجد خطة أقساط لهذه الفاتورة.',
+                    'message' => 'no_installment_plan',
                 ], 404);
             }
 
             return response()->json([
                 'status'  => true,
-                'message' => 'تم جلب خطة الأقساط بنجاح',
+                'message' => 'fetched',
                 'data'    => $plan,
             ], 200);
         } catch (\Exception $e) {
@@ -196,29 +197,20 @@ class InvoiceController extends Controller
         }
     }
 
-    /**
-     * ✅ إضافة: جلب عدد التنبيهات للجرس
-     */
     public function notificationCounts()
     {
-        try {
-            $counts = \App\Helpers\InvoiceNotificationHelper::getCounts();
+        $counts = \App\Helpers\InvoiceNotificationHelper::getCounts();
 
-            return response()->json([
-                'status' => true,
-                'data' => [
-                    'unpaid'   => $counts['unpaid'],
-                    'overdue'  => $counts['overdue'],
-                    'due_soon' => $counts['due_soon'],
-                    'total'    => $counts['total'],
-                ],
-            ]);
-        } catch (\Exception $e) {
-            Log::error('InvoiceController notificationCounts error', ['error' => $e->getMessage()]);
-            return response()->json([
-                'status' => false,
-                'message' => __('messages.operation_failed'),
-            ], 500);
-        }
+        return response()->json([
+            'status' => true,
+            'message' => 'Notification counts fetched',
+            'data' => [
+                'unpaid'       => $counts['unpaid'],
+                'overdue'      => $counts['overdue'],
+                'due_soon'     => $counts['due_soon'],
+                'open_tickets' => $counts['open_tickets'],
+                'total'        => $counts['total'],
+            ],
+        ]);
     }
 }

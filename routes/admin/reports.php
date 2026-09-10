@@ -10,9 +10,11 @@ Route::prefix('reports')->group(function () {
     Route::get('clients',  [ReportController::class, 'clients']);
     Route::get('revenue',  [ReportController::class, 'revenue']);
     Route::get('overdue',  [ReportController::class, 'overdue']);
+    Route::get('aging',    [ReportController::class, 'aging']);
 
     // ── Exports: ✅ Rate Limit مخصص (10 ملفات/5 دقائق) ───────────────
     // لأن توليد Excel يضغط على CPU والذاكرة
+    // ملاحظة: aging غير مضاف هنا بعد لأن AgingReportExport لم يُبنَ بعد
     Route::get('export/{type}', [ReportController::class, 'export'])
         ->middleware('throttle:exports')
         ->where('type', 'invoices|clients|revenue|overdue'); // ✅ تحقق من النوع في الـ Route

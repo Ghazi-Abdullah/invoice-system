@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             PermissionSystemSeeder::class,
             InstallmentInterestTierSeeder::class,
             ContentPagesSeeder::class,
+            BranchesSeeder::class,
             //InstallmentPlansSeeder::class,
         ]);
     }

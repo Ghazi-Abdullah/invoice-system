@@ -28,6 +28,7 @@ class UpdateClientRequest extends FormRequest
             'company_name' => 'nullable|string|max:255',
             'tax_number' => 'nullable|string|max:100',
             'payment_terms' => 'nullable|string|max:50',
+            'credit_limit' => 'nullable|numeric|min:0',
             'currency' => 'nullable|in:USD,EUR,GBP,SAR,AED',
             'notes' => 'nullable|string',
             'is_active' => 'nullable|boolean',

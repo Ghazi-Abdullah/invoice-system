@@ -13,6 +13,7 @@ class Invoice extends Model
     protected $fillable = [
         'client_id',
         'user_id',
+        'branch_id',
         'invoice_number',
         'invoice_date',
         'due_date',
@@ -28,6 +29,7 @@ class Invoice extends Model
         'footer',
         'enable_stripe_checkout',
         'sent_at',
+        'due_reminder_sent_at',
         'paid_at',
         'created_by',
         'is_active',
@@ -42,6 +44,7 @@ class Invoice extends Model
         'due_date'               => 'date',
         'payment_date'           => 'date',
         'sent_at'                => 'datetime',
+        'due_reminder_sent_at'   => 'datetime',
         'paid_at'                => 'datetime',
         'subtotal'               => 'decimal:2',
         'tax_amount'             => 'decimal:2',
@@ -51,13 +54,13 @@ class Invoice extends Model
         'is_active'              => 'boolean',
         'client_id'              => 'integer',
         'user_id'                => 'integer',
+        'branch_id'              => 'integer',
         'created_by'             => 'integer',
     ];
 
     // ================================================================
     // Scopes
     // ================================================================
-
     public function scopeActive($query)
     {
         return $query->where('is_active', Constants::ACTIVE);
@@ -102,10 +105,18 @@ class Invoice extends Model
         });
     }
 
+    // ✅ جديد: فلترة حسب الفرع
+    public function scopeByBranch($query, ?int $branchId)
+    {
+        if ($branchId) {
+            return $query->where('branch_id', $branchId);
+        }
+        return $query;
+    }
+
     // ================================================================
     // Relations
     // ================================================================
-
     public function client()
     {
         return $this->belongsTo(Client::class);
@@ -151,10 +162,15 @@ class Invoice extends Model
         return $this->hasMany(PaymentLink::class)->orderBy('created_at', 'desc');
     }
 
+    // ✅ جديد: علاقة الفرع
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
     // ================================================================
     // Methods
     // ================================================================
-
     public function generateInvoiceNumber(): string
     {
         $year   = date('Y');

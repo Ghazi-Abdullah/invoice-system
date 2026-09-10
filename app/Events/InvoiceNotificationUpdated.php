@@ -12,32 +12,33 @@ class InvoiceNotificationUpdated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public int $unpaidCount;
-    public int $overdueCount;
-    public int $dueSoonCount;
-    public int $totalCount;
-    public ?string $trigger; // سبب التحديث: 'due_date_check', 'invoice_paid', 'invoice_created', etc.
-
     public function __construct(
-        int $unpaidCount,
-        int $overdueCount,
-        int $dueSoonCount,
-        ?string $trigger = null
-    ) {
-        $this->unpaidCount = $unpaidCount;
-        $this->overdueCount = $overdueCount;
-        $this->dueSoonCount = $dueSoonCount;
-        $this->totalCount = $unpaidCount + $overdueCount + $dueSoonCount;
-        $this->trigger = $trigger;
-    }
+        public int $unpaid,
+        public int $overdue,
+        public int $dueSoon,
+        public int $openTickets,
+        public ?string $trigger = null
+    ) {}
 
     public function broadcastOn(): array
     {
+        // ← توافق مع Frontend اللي يستمع على invoice-admin-channel
         return [new Channel('invoice-admin-channel')];
     }
 
     public function broadcastAs(): string
     {
         return 'invoice-notification-updated';
+    }
+
+    public function broadcastWith(): array
+    {
+        return [
+            'unpaidCount'   => $this->unpaid,
+            'overdueCount'  => $this->overdue,
+            'dueSoonCount'  => $this->dueSoon,
+            'openTicketsCount' => $this->openTickets,
+            'trigger'       => $this->trigger,
+        ];
     }
 }

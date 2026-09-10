@@ -30,6 +30,7 @@ class ReportController extends Controller
     {
         try {
             $filters = $request->validated();
+            $filters['branch_id'] = $request->attributes->get('selected_branch_id');
             $report = $this->reportRepository->getInvoiceReport($filters);
 
             return response()->json([
@@ -52,6 +53,7 @@ class ReportController extends Controller
     {
         try {
             $filters = $request->validated();
+            $filters['branch_id'] = $request->attributes->get('selected_branch_id');
             $report = $this->reportRepository->getClientReport($filters);
 
             return response()->json([
@@ -74,6 +76,7 @@ class ReportController extends Controller
     {
         try {
             $filters = $request->validated();
+            $filters['branch_id'] = $request->attributes->get('selected_branch_id');
             $report = $this->reportRepository->getRevenueReport($filters);
 
             return response()->json([
@@ -96,17 +99,41 @@ class ReportController extends Controller
     {
         try {
             $filters = $request->validated();
+            $filters['branch_id'] = $request->attributes->get('selected_branch_id');
             $report = $this->reportRepository->getOverdueReport($filters);
 
             return response()->json([
                 'success' => true,
-                'message' => 'تم تحميل تقرير المتأخرات بنجاح',
+                'message' => 'created',
                 'data' => $report
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في تحميل التقرير: ' . $e->getMessage()
+                'message' => 'failed to create report: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * تقرير أعمار الديون
+     */
+    public function aging(ReportFilterRequest $request): JsonResponse
+    {
+        try {
+            $filters = $request->validated();
+            $filters['branch_id'] = $request->attributes->get('selected_branch_id');
+            $report = $this->reportRepository->getAgingReport($filters);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'created',
+                'data' => $report
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'failed to create report: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -117,16 +144,14 @@ class ReportController extends Controller
     public function export(Request $request, string $type): JsonResponse|\Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         try {
-            // ضبط اللغة إذا تم إرسالها
             if ($request->has('lang')) {
                 app()->setLocale($request->input('lang'));
             }
 
             $filters = $request->all();
-            // إزالة lang من الفلاتر حتى لا يؤثر على الاستعلام
             unset($filters['lang']);
+            $filters['branch_id'] = $request->attributes->get('selected_branch_id');
 
-            // إضافة تواريخ افتراضية إذا لم تكن موجودة
             if (empty($filters['start_date'])) {
                 $filters['start_date'] = now()->subDays(30)->format('Y-m-d');
             }
@@ -134,7 +159,6 @@ class ReportController extends Controller
                 $filters['end_date'] = now()->format('Y-m-d');
             }
 
-            // جلب البيانات حسب نوع التقرير
             $reportData = $this->getReportData($type, $filters);
 
             if (empty($reportData['items'])) {
@@ -144,14 +168,12 @@ class ReportController extends Controller
                 ], 404);
             }
 
-            // اختيار كلاس التصدير المناسب
             $exportClass = $this->getExportClass($type, $reportData);
 
             if ($request->has('download') && $request->input('download') === '1') {
                 return Excel::download($exportClass, $this->getFileName($type));
             }
 
-            // حفظ في الخادم
             $fileName = $this->getFileName($type, true);
             $filePath = 'exports/' . $fileName;
             Excel::store($exportClass, $filePath, 'public');
@@ -194,7 +216,7 @@ class ReportController extends Controller
             case 'overdue':
                 return $this->reportRepository->getOverdueReport($filters);
             default:
-                throw new \InvalidArgumentException("نوع التقرير غير صحيح: {$type}");
+                throw new \InvalidArgumentException("report type not found: {$type}");
         }
     }
 
@@ -213,7 +235,7 @@ class ReportController extends Controller
             case 'overdue':
                 return new OverdueReportExport($data);
             default:
-                throw new \InvalidArgumentException("نوع التقرير غير صحيح: {$type}");
+                throw new \InvalidArgumentException("report type not found: {$type}");
         }
     }
 
@@ -223,13 +245,13 @@ class ReportController extends Controller
     private function getFileName(string $type, bool $withTimestamp = false): string
     {
         $names = [
-            'invoices' => 'تقرير_الفواتير',
-            'clients' => 'تقرير_العملاء',
-            'revenue' => 'تقرير_الإيرادات',
-            'overdue' => 'تقرير_المتأخرات'
+            'invoices' => 'invoice_report',
+            'clients' => 'client_report',
+            'revenue' => 'revenue_report',
+            'overdue' => 'overdue_report',
         ];
 
-        $baseName = $names[$type] ?? 'تقرير';
+        $baseName = $names[$type] ?? 'report';
         $timestamp = $withTimestamp ? '_' . date('Y_m_d_His') : '';
 
         return $baseName . $timestamp . '.xlsx';
@@ -271,20 +293,19 @@ class ReportController extends Controller
                 }
             }
 
-            // ترتيب حسب تاريخ التعديل (الأحدث أولاً)
             usort($files, function ($a, $b) {
                 return strtotime($b['modified']) - strtotime($a['modified']);
             });
 
             return response()->json([
                 'success' => true,
-                'message' => 'تم جلب الملفات المصدرة بنجاح',
+                'message' => 'failed to create report: ' . $e->getMessage(),
                 'data' => $files
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في جلب الملفات: ' . $e->getMessage(),
+                'message' => 'failed to create report: ' . $e->getMessage(),
                 'data' => []
             ], 500);
         }
@@ -306,25 +327,25 @@ class ReportController extends Controller
             if (!file_exists($filePath)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'الملف غير موجود'
+                    'message' => 'file_not_found'
                 ], 404);
             }
 
             if (unlink($filePath)) {
                 return response()->json([
                     'success' => true,
-                    'message' => 'تم حذف الملف بنجاح'
+                    'message' => 'file_deleted_successfully'
                 ]);
             } else {
                 return response()->json([
                     'success' => false,
-                    'message' => 'فشل في حذف الملف'
+                    'message' => 'failed_to_delete_file'
                 ], 500);
             }
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في حذف الملف: ' . $e->getMessage()
+                'message' => 'failed to delete file: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -345,7 +366,7 @@ class ReportController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في إرسال التذكير: ' . $e->getMessage()
+                'message' => 'failed to send reminder: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -366,7 +387,7 @@ class ReportController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في تسديد الفاتورة: ' . $e->getMessage()
+                'message' => 'failed to mark invoice as paid: ' . $e->getMessage()
             ], 500);
         }
     }

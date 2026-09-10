@@ -13,14 +13,13 @@ class ClientRepository implements ClientInterface
     public function index($request)
     {
         try {
-            // ✅ بدل with(['user','invoices']) ثم loop بـ 4 queries لكل عميل
-            // نستخدم withCount + withSum في query واحد
             $query = Client::withCount('invoices')
                 ->withSum('invoices', 'total')
                 ->withSum(['invoices as paid_amount' => function ($q) {
                     $q->where('status', Constants::INVOICE_STATUS_PAID);
                 }], 'total')
-                ->with('creator:id,name')        // ✅ select فقط ما نحتاجه
+                ->with('creator:id,name')
+                ->when($request->attributes->get('selected_branch_id'), fn($q, $branchId) => $q->where('branch_id', $branchId))
                 ->orderBy('created_at', 'desc');
 
             if ($request->has('is_active') && $request->is_active !== '') {
@@ -41,7 +40,6 @@ class ClientRepository implements ClientInterface
                 $clients = $query->paginate(Constants::DEFAULT_PER_PAGE);
             }
 
-            // ✅ حساب total_due من البيانات المحملة — بدون queries إضافية
             $clients->getCollection()->transform(function ($client) {
                 $client->total_invoiced = (float) ($client->invoices_sum_total ?? 0);
                 $client->total_paid     = (float) ($client->paid_amount ?? 0);
@@ -76,7 +74,6 @@ class ClientRepository implements ClientInterface
                 ];
             }
 
-            // ✅ كل الإحصائيات في query واحد
             $client = Client::withCount('invoices')
                 ->withSum('invoices', 'total')
                 ->withSum(['invoices as paid_amount' => function ($q) {
@@ -134,6 +131,23 @@ class ClientRepository implements ClientInterface
                 ];
             }
 
+            // ✅ الفرع: من الطلب صراحة إن وُجد، وإلا الفرع المختار حالياً؛
+            // ونتحقق أن المستخدم فعلاً يملك صلاحية الوصول لهذا الفرع
+            $branchId = $request->has('branch_id') && $request->branch_id
+                ? (int) $request->branch_id
+                : $request->attributes->get('selected_branch_id');
+
+            $allowedBranchIds = $request->attributes->get('allowed_branch_ids');
+            if ($branchId && is_array($allowedBranchIds) && !in_array((int) $branchId, $allowedBranchIds, true)) {
+                DB::rollBack();
+
+                return [
+                    'status'  => false,
+                    'message' => 'ليس لديك صلاحية لإضافة عميل لهذا الفرع',
+                    'data'    => null,
+                ];
+            }
+
             $client = Client::create([
                 'name'          => $request->name,
                 'email'         => strtolower(trim($request->email)),
@@ -142,9 +156,11 @@ class ClientRepository implements ClientInterface
                 'company_name'  => $request->company_name,
                 'tax_number'    => $request->tax_number,
                 'payment_terms' => $request->payment_terms ?? Constants::PAYMENT_TERM_NET_30,
+                'credit_limit'  => $request->credit_limit,
                 'currency'      => $request->currency      ?? Constants::CURRENCY_SAR,
                 'notes'         => $request->notes,
                 'is_active'     => $request->is_active ?? true,
+                'branch_id'     => $branchId ? (int) $branchId : null,
                 'created_by'    => auth()->id(),
             ]);
 
@@ -194,9 +210,11 @@ class ClientRepository implements ClientInterface
                 'company_name',
                 'tax_number',
                 'payment_terms',
+                'credit_limit',
                 'currency',
                 'notes',
                 'is_active',
+                'branch_id',
             ];
 
             $updateData = [];
@@ -213,13 +231,29 @@ class ClientRepository implements ClientInterface
                 $updateData['email'] = strtolower(trim($updateData['email']));
             }
 
+            // ✅ نقل العميل لفرع آخر - العميل فقط، فواتيره القديمة تبقى
+            // على فرعها الأصلي (لا تنتقل معه تلقائيًا)
+            if (array_key_exists('branch_id', $updateData)) {
+                $newBranchId = $updateData['branch_id'] ? (int) $updateData['branch_id'] : null;
+                $allowedBranchIds = $request->attributes->get('allowed_branch_ids');
+
+                if ($newBranchId && is_array($allowedBranchIds) && !in_array($newBranchId, $allowedBranchIds, true)) {
+                    return [
+                        'status'  => false,
+                        'message' => 'ليس لديك صلاحية لنقل العميل لهذا الفرع',
+                        'data'    => null,
+                    ];
+                }
+
+                $updateData['branch_id'] = $newBranchId;
+            }
+
             $client->update($updateData);
 
             ActivityLog::log('UPDATE', __('messages.client_updated') . ': ' . $client->name, $client, $oldValues, $client->fresh()->toArray());
 
             DB::commit();
 
-            // ✅ إعادة تحميل مع الإحصائيات بـ query واحد
             $client = Client::withCount('invoices')
                 ->withSum('invoices', 'total')
                 ->withSum(['invoices as paid_amount' => fn($q) => $q->where('status', Constants::INVOICE_STATUS_PAID)], 'total')
@@ -252,7 +286,6 @@ class ClientRepository implements ClientInterface
         DB::beginTransaction();
 
         try {
-            // ✅ withCount بدل invoices()->count()
             $client->loadCount('invoices');
 
             if ($client->invoices_count > 0) {
@@ -291,7 +324,6 @@ class ClientRepository implements ClientInterface
     public function getClientStats($client)
     {
         try {
-            // ✅ كل الإحصائيات في query واحد بدل 5 queries
             $stats = $client->invoices()
                 ->selectRaw('
                     COUNT(*) as total_invoices,
@@ -334,8 +366,8 @@ class ClientRepository implements ClientInterface
         try {
             $search = substr(trim($request->search ?? ''), 0, 100);
 
-            // ✅ select فقط الحقول المطلوبة — لا تجلب كل الـ columns
-            $clients = Client::select(['id', 'name', 'email', 'phone', 'company_name', 'is_active'])
+            $clients = Client::select(['id', 'name', 'email', 'phone', 'company_name', 'is_active', 'branch_id'])
+                ->when($request->attributes->get('selected_branch_id'), fn($q, $branchId) => $q->where('branch_id', $branchId))
                 ->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
@@ -364,7 +396,8 @@ class ClientRepository implements ClientInterface
     public function getClientInvoices($client)
     {
         try {
-            // ✅ with للعلاقات المطلوبة في العرض
+            // ملاحظة: بلا فلترة فرع عمداً - صفحة العميل تعرض سجله الكامل
+            // حتى لو جزء منه يعود لفرع نُقل منه لاحقًا
             $invoices = $client->invoices()
                 ->with(['items'])
                 ->orderBy('created_at', 'desc')
