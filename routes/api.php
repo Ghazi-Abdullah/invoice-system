@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PaymentLinkController;
 use App\Http\Controllers\Admin\SupportTicketController;
 use App\Http\Controllers\Admin\OtpLogController;
+use App\Http\Middleware\BranchMiddleware;
 
 /*
 |--------------------------------------------------------------------------
@@ -91,17 +92,33 @@ Route::prefix('admin')->middleware([
     Route::get('/otp-logs',      [OtpLogController::class, 'index']);
 
     // ── Includes ────────────────────────────────────────────
-    require __DIR__ . '/admin/clients.php';
+
     require __DIR__ . '/admin/branches.php';
-    require __DIR__ . '/admin/invoices.php';
-    require __DIR__ . '/admin/installments.php';
-    require __DIR__ . '/admin/users.php';
-    require __DIR__ . '/admin/dashboard.php';
-    require __DIR__ . '/admin/permissions.php';
-    require __DIR__ . '/admin/admin-groups.php';
-    require __DIR__ . '/admin/payments.php';
-    require __DIR__ . '/admin/reports.php';
-    require __DIR__ . '/admin/recurring-invoices.php';
-    require __DIR__ . '/admin/payment-links.php';
-    require __DIR__ . '/admin/support.php';
+
+    Route::middleware([BranchMiddleware::class])->group(function () {
+        require __DIR__ . '/admin/clients.php';
+        require __DIR__ . '/admin/invoices.php';
+        require __DIR__ . '/admin/reports.php';
+        require __DIR__ . '/admin/installments.php';
+        require __DIR__ . '/admin/users.php';
+        require __DIR__ . '/admin/dashboard.php';
+        require __DIR__ . '/admin/permissions.php';
+        require __DIR__ . '/admin/admin-groups.php';
+        require __DIR__ . '/admin/payments.php';
+        require __DIR__ . '/admin/recurring-invoices.php';
+        require __DIR__ . '/admin/payment-links.php';
+        require __DIR__ . '/admin/support.php';
+    });
+    // require __DIR__ . '/admin/clients.php';
+    // require __DIR__ . '/admin/invoices.php';
+    // require __DIR__ . '/admin/reports.php';
+    // require __DIR__ . '/admin/installments.php';
+    // require __DIR__ . '/admin/users.php';
+    // require __DIR__ . '/admin/dashboard.php';
+    // require __DIR__ . '/admin/permissions.php';
+    // require __DIR__ . '/admin/admin-groups.php';
+    // require __DIR__ . '/admin/payments.php';
+    // require __DIR__ . '/admin/recurring-invoices.php';
+    // require __DIR__ . '/admin/payment-links.php';
+    // require __DIR__ . '/admin/support.php';
 });

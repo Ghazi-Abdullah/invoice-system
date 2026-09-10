@@ -9,7 +9,7 @@ class MarkOverdueInstallments extends Command
 {
     protected $signature = 'installments:mark-overdue';
 
-    protected $description = 'تحديث حالة الأقساط اللي فات موعد استحقاقها ولسا ما انسددت إلى overdue';
+    protected $description = 'Mark installments as  overdue';
 
     public function handle()
     {
@@ -17,7 +17,7 @@ class MarkOverdueInstallments extends Command
             ->whereDate('due_date', '<', now()->toDateString())
             ->update(['status' => 'overdue']);
 
-        $this->info("تم تحديث {$count} قسط إلى حالة متأخر.");
+        $this->info("Updated {$count} installments to overdue status.");
 
         return self::SUCCESS;
     }

@@ -189,7 +189,13 @@ class BranchController extends Controller
 
     public function assignBranches(Request $request)
     {
-        if (!\App\Helpers\PermissionHelper::checkPermission(Constants::MANAGE_BRANCHES)) {             return $this->failureResponse(                 __('messages.no_permission'),                 null,                 Constants::RESPONSE_FORBIDDEN             );         } 
+        if (!\App\Helpers\PermissionHelper::checkPermission(Constants::MANAGE_BRANCHES)) {
+            return $this->failureResponse(
+                __('messages.no_permission'),
+                null,
+                Constants::RESPONSE_FORBIDDEN
+            );
+        }
         try {
             $validated = $request->validate([
                 'user_id'            => ['required', 'exists:users,id'],

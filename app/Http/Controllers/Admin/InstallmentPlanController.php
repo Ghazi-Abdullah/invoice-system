@@ -36,10 +36,10 @@ class InstallmentPlanController extends Controller
         $plan = $this->installmentPlanRepository->findForInvoice($invoice);
 
         if (!$plan) {
-            return $this->notFoundResponse('لا توجد خطة أقساط لهذه الفاتورة.');
+            return $this->notFoundResponse('no_installment_plan');
         }
 
-        return $this->successResponse('تم جلب خطة الأقساط', $plan);
+        return $this->successResponse('fetched', $plan);
     }
 
     /**
@@ -50,7 +50,7 @@ class InstallmentPlanController extends Controller
     {
         $rate = $this->installmentPlanRepository->suggestInterestRate($numberOfInstallments);
 
-        return $this->successResponse('تم جلب النسبة المقترحة', ['interest_rate' => $rate]);
+        return $this->successResponse('fetched', ['interest_rate' => $rate]);
     }
 
     /**
@@ -68,7 +68,7 @@ class InstallmentPlanController extends Controller
                 'created_by' => auth('sanctum')->id(),
             ]);
 
-            return $this->successResponse('تم إنشاء خطة الأقساط بنجاح', $plan, Constants::RESPONSE_CREATED);
+            return $this->successResponse('created', $plan, Constants::RESPONSE_CREATED);
         } catch (ValidationException $e) {
             return $this->validationErrorResponse($e->errors());
         }
@@ -89,7 +89,7 @@ class InstallmentPlanController extends Controller
                 $request->input('payment_method', 'cash')
             );
 
-            return $this->successResponse('تم تسجيل سداد القسط بنجاح', $installment);
+            return $this->successResponse('paid', $installment);
         } catch (ValidationException $e) {
             return $this->validationErrorResponse($e->errors());
         }
@@ -107,7 +107,7 @@ class InstallmentPlanController extends Controller
         try {
             $plan = $this->installmentPlanRepository->cancel($installmentPlan);
 
-            return $this->successResponse('تم إلغاء خطة الأقساط', $plan);
+            return $this->successResponse('cancelled', $plan);
         } catch (ValidationException $e) {
             return $this->validationErrorResponse($e->errors());
         }

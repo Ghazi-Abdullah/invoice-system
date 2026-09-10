@@ -4,9 +4,10 @@
 
 use App\Http\Controllers\Admin\DashboardController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Middleware\BranchMiddleware;
 
-Route::middleware(['auth:sanctum'])->group(function () {
-    //Route::middleware(['auth:sanctum', 'branch'])->group(function () {
+
+Route::middleware(['auth:sanctum', BranchMiddleware::class])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'dashboard']);
     Route::get('/dashboard/stats', [DashboardController::class, 'stats']);

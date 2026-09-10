@@ -31,6 +31,6 @@ class OtpLogController extends Controller
         }
 
         $logs = $this->otpLogRepository->all();
-        return $this->successResponse('تم جلب السجلات', $logs);
+        return $this->successResponse('fetched', $logs);
     }
 }

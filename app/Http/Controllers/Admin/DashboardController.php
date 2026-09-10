@@ -23,7 +23,7 @@ class DashboardController extends Controller
             if (!$user) {
                 return response()->json([
                     'status' => false,
-                    'message' => 'غير مصرح لك'
+                    'message' => 'not authenticated'
                 ], 401);
             }
 
@@ -32,7 +32,7 @@ class DashboardController extends Controller
 
             return response()->json([
                 'status' => true,
-                'message' => 'تم جلب بيانات لوحة التحكم بنجاح',
+                'message' => 'success',
                 'data' => $data
             ]);
 
@@ -41,7 +41,7 @@ class DashboardController extends Controller
 
             return response()->json([
                 'status' => false,
-                'message' => 'خطأ في جلب بيانات الداشبورد',
+                'message' => 'error fetching dashboard data',
                 'error' => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }
@@ -53,7 +53,7 @@ class DashboardController extends Controller
             $user = $request->user();
 
             if (!$user) {
-                return response()->json(['status' => false, 'message' => 'غير مصرح'], 401);
+                return response()->json(['status' => false, 'message' => 'not authenticated'], 401);
             }
 
             $branchId = $request->attributes->get('selected_branch_id');
@@ -68,7 +68,7 @@ class DashboardController extends Controller
             Log::error('Dashboard stats error: ' . $e->getMessage());
             return response()->json([
                 'status' => false,
-                'message' => 'خطأ في جلب الإحصائيات'
+                'message' => 'error fetching statistics'
             ], 500);
         }
     }
@@ -79,7 +79,7 @@ class DashboardController extends Controller
             $user = $request->user();
 
             if (!$user) {
-                return response()->json(['status' => false, 'message' => 'غير مصرح'], 401);
+                return response()->json(['status' => false, 'message' => 'not authenticated'], 401);
             }
 
             $branchId = $request->attributes->get('selected_branch_id');
@@ -94,7 +94,7 @@ class DashboardController extends Controller
             Log::error('Monthly revenue error: ' . $e->getMessage());
             return response()->json([
                 'status' => false,
-                'message' => 'خطأ في جلب الإيرادات الشهرية'
+                'message' => 'error fetching monthly revenue'
             ], 500);
         }
     }
@@ -105,7 +105,7 @@ class DashboardController extends Controller
             $user = $request->user();
 
             if (!$user) {
-                return response()->json(['status' => false, 'message' => 'غير مصرح'], 401);
+                return response()->json(['status' => false, 'message' => 'not authenticated'], 401);
             }
 
             $branchId = $request->attributes->get('selected_branch_id');
@@ -120,7 +120,7 @@ class DashboardController extends Controller
             Log::error('Recent activity error: ' . $e->getMessage());
             return response()->json([
                 'status' => false,
-                'message' => 'خطأ في جلب النشاط الحديث'
+                'message' => 'error fetching recent activity'
             ], 500);
         }
     }

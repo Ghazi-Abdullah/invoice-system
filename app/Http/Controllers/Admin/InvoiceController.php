@@ -175,13 +175,13 @@ class InvoiceController extends Controller
             if (!$plan) {
                 return response()->json([
                     'status'  => false,
-                    'message' => 'لا توجد خطة أقساط لهذه الفاتورة.',
+                    'message' => 'no_installment_plan',
                 ], 404);
             }
 
             return response()->json([
                 'status'  => true,
-                'message' => 'تم جلب خطة الأقساط بنجاح',
+                'message' => 'fetched',
                 'data'    => $plan,
             ], 200);
         } catch (\Exception $e) {

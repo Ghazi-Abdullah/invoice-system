@@ -48,7 +48,7 @@ class AuthController extends Controller
             if (Cache::has($lockKey)) {
                 $remaining = Cache::get($lockKey . '_remaining', self::LOCKOUT_MINUTES);
                 return $this->failureResponse(
-                    "تم قفل الحساب مؤقتاً. حاول بعد {$remaining} دقيقة.",
+                    "Too many login attempts. Please try again in {$remaining} minutes.",
                     null,
                     Constants::RESPONSE_TOO_MANY_REQUESTS
                 );
@@ -87,7 +87,7 @@ class AuthController extends Controller
             }
 
             return $this->successResponse(
-                'تم التحقق من بيانات الدخول، تم إرسال رمز التحقق إلى بريدك الإلكتروني',
+                'Login credentials verified. An OTP has been sent to your email.',
                 [
                     'requires_otp' => true,
                     'email'        => $user->email,
@@ -444,7 +444,7 @@ class AuthController extends Controller
         if ($user->otp_created_at && abs($user->otp_created_at->diffInSeconds(now())) < self::OTP_COOLDOWN_SECONDS) {
             $remaining = self::OTP_COOLDOWN_SECONDS - abs($user->otp_created_at->diffInSeconds(now()));
             $minutes = ceil($remaining / 60);
-            return "تم إرسال رمز مسبقاً، حاول بعد {$minutes} دقيقة";
+            return "{$minutes} minutes remaining before you can request a new OTP.";
         }
 
         $plainOtp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);

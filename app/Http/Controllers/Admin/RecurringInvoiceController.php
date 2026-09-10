@@ -38,7 +38,7 @@ class RecurringInvoiceController extends Controller
     {
         $template = RecurringInvoiceTemplate::find($id);
         if (!$template) {
-            return response()->json(['status' => false, 'message' => 'القالب غير موجود'], 404);
+            return response()->json(['status' => false, 'message' =>'not_found'], 404);
         }
 
         $result = $this->repository->update($request, $template);
@@ -49,7 +49,7 @@ class RecurringInvoiceController extends Controller
     {
         $template = RecurringInvoiceTemplate::find($id);
         if (!$template) {
-            return response()->json(['status' => false, 'message' => 'القالب غير موجود'], 404);
+            return response()->json(['status' => false, 'message' =>'not_found'], 404);
         }
 
         $result = $this->repository->destroy($template);
@@ -60,7 +60,7 @@ class RecurringInvoiceController extends Controller
     {
         $template = RecurringInvoiceTemplate::find($id);
         if (!$template) {
-            return response()->json(['status' => false, 'message' => 'القالب غير موجود'], 404);
+            return response()->json(['status' => false, 'message' =>'not_found'], 404);
         }
 
         $result = $this->repository->generateNow($template);
@@ -71,7 +71,7 @@ class RecurringInvoiceController extends Controller
     {
         $template = RecurringInvoiceTemplate::find($id);
         if (!$template) {
-            return response()->json(['status' => false, 'message' => 'القالب غير موجود'], 404);
+            return response()->json(['status' => false, 'message' =>'not_found'], 404);
         }
 
         $result = $this->repository->cancel($template);

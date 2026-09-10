@@ -21,7 +21,7 @@ class StoreBranchRequest extends FormRequest
             'phone'     => ['nullable', 'string', 'max:50'],
             'email'     => ['nullable', 'email', 'max:255'],
             'city'      => ['nullable', 'string', 'max:100'],
-            'is_active' => ['boolean'],app/Http/Requests/Admin/Branch/UpdateBranchRequest.php
+            'is_active' => ['boolean'],
             'is_main'   => ['boolean'],
         ];
     }

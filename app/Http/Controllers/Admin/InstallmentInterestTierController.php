@@ -21,7 +21,7 @@ class InstallmentInterestTierController extends Controller
 
     public function index()
     {
-        return $this->successResponse('تم جلب جدول نسب الفائدة', $this->tierRepository->all());
+        return $this->successResponse('fetched', $this->tierRepository->all());
     }
 
     public function store(Request $request)
@@ -36,13 +36,13 @@ class InstallmentInterestTierController extends Controller
             $validated['interest_rate']
         );
 
-        return $this->successResponse('تم حفظ النسبة بنجاح', $tier);
+        return $this->successResponse('saved', $tier);
     }
 
     public function destroy(InstallmentInterestTier $installmentInterestTier)
     {
         $this->tierRepository->delete($installmentInterestTier);
 
-        return $this->successResponse('تم حذف النسبة');
+        return $this->successResponse('deleted', $installmentInterestTier);
     }
 }

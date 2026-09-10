@@ -104,13 +104,13 @@ class ReportController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'تم تحميل تقرير المتأخرات بنجاح',
+                'message' => 'created',
                 'data' => $report
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في تحميل التقرير: ' . $e->getMessage()
+                'message' => 'failed to create report: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -127,13 +127,13 @@ class ReportController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'تم تحميل تقرير أعمار الديون بنجاح',
+                'message' => 'created',
                 'data' => $report
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في تحميل التقرير: ' . $e->getMessage()
+                'message' => 'failed to create report: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -216,7 +216,7 @@ class ReportController extends Controller
             case 'overdue':
                 return $this->reportRepository->getOverdueReport($filters);
             default:
-                throw new \InvalidArgumentException("نوع التقرير غير صحيح: {$type}");
+                throw new \InvalidArgumentException("report type not found: {$type}");
         }
     }
 
@@ -235,7 +235,7 @@ class ReportController extends Controller
             case 'overdue':
                 return new OverdueReportExport($data);
             default:
-                throw new \InvalidArgumentException("نوع التقرير غير صحيح: {$type}");
+                throw new \InvalidArgumentException("report type not found: {$type}");
         }
     }
 
@@ -245,13 +245,13 @@ class ReportController extends Controller
     private function getFileName(string $type, bool $withTimestamp = false): string
     {
         $names = [
-            'invoices' => 'تقرير_الفواتير',
-            'clients' => 'تقرير_العملاء',
-            'revenue' => 'تقرير_الإيرادات',
-            'overdue' => 'تقرير_المتأخرات'
+            'invoices' => 'invoice_report',
+            'clients' => 'client_report',
+            'revenue' => 'revenue_report',
+            'overdue' => 'overdue_report',
         ];
 
-        $baseName = $names[$type] ?? 'تقرير';
+        $baseName = $names[$type] ?? 'report';
         $timestamp = $withTimestamp ? '_' . date('Y_m_d_His') : '';
 
         return $baseName . $timestamp . '.xlsx';
@@ -299,13 +299,13 @@ class ReportController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'تم جلب الملفات المصدرة بنجاح',
+                'message' => 'failed to create report: ' . $e->getMessage(),
                 'data' => $files
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في جلب الملفات: ' . $e->getMessage(),
+                'message' => 'failed to create report: ' . $e->getMessage(),
                 'data' => []
             ], 500);
         }
@@ -327,25 +327,25 @@ class ReportController extends Controller
             if (!file_exists($filePath)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'الملف غير موجود'
+                    'message' => 'file_not_found'
                 ], 404);
             }
 
             if (unlink($filePath)) {
                 return response()->json([
                     'success' => true,
-                    'message' => 'تم حذف الملف بنجاح'
+                    'message' => 'file_deleted_successfully'
                 ]);
             } else {
                 return response()->json([
                     'success' => false,
-                    'message' => 'فشل في حذف الملف'
+                    'message' => 'failed_to_delete_file'
                 ], 500);
             }
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في حذف الملف: ' . $e->getMessage()
+                'message' => 'failed to delete file: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -366,7 +366,7 @@ class ReportController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في إرسال التذكير: ' . $e->getMessage()
+                'message' => 'failed to send reminder: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -387,7 +387,7 @@ class ReportController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'فشل في تسديد الفاتورة: ' . $e->getMessage()
+                'message' => 'failed to mark invoice as paid: ' . $e->getMessage()
             ], 500);
         }
     }
