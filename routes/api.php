@@ -108,6 +108,10 @@ Route::prefix('admin')->middleware([
         require __DIR__ . '/admin/recurring-invoices.php';
         require __DIR__ . '/admin/payment-links.php';
         require __DIR__ . '/admin/support.php';
+        require __DIR__ . '/admin/properties.php';
+        require __DIR__ . '/admin/floors.php';
+        require __DIR__ . '/admin/units.php';
+        require __DIR__ . '/admin/tenants.php';
     });
     // require __DIR__ . '/admin/clients.php';
     // require __DIR__ . '/admin/invoices.php';

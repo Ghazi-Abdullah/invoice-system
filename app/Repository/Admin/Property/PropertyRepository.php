@@ -1,0 +1,179 @@
+<?php
+
+namespace App\Repository\Admin\Property;
+
+use App\Models\Property;
+use App\Models\ActivityLog;
+use App\Constants\Constants;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class PropertyRepository implements PropertyInterface
+{
+    public function index($request)
+    {
+        try {
+            $query = Property::withCount('floors')
+                ->with('creator:id,name')
+                ->when($request->attributes->get('selected_branch_id'), fn($q, $branchId) => $q->where('branch_id', $branchId))
+                ->orderBy('created_at', 'desc');
+
+            if ($request->has('is_active') && $request->is_active !== '') {
+                $query->where('is_active', (bool) $request->is_active);
+            }
+
+            if ($request->has('search') && !empty($request->search)) {
+                $search = substr(trim($request->search), 0, 100);
+                $query->search($search);
+            }
+
+            if ($request->has('per_page')) {
+                $perPage = (int) $request->per_page;
+                $perPage = min($perPage, Constants::MAX_PER_PAGE);
+                $perPage = max($perPage, Constants::MIN_PER_PAGE);
+                $properties = $query->paginate($perPage);
+            } else {
+                $properties = $query->paginate(Constants::DEFAULT_PER_PAGE);
+            }
+
+            return ['status' => true, 'message' => __('messages.properties_fetched'), 'data' => $properties];
+        } catch (\Exception $e) {
+            Log::error('PropertyRepository index error', ['error' => $e->getMessage()]);
+            return ['status' => false, 'message' => __('messages.operation_failed'), 'data' => null];
+        }
+    }
+
+    public function show($id)
+    {
+        try {
+            if (!is_numeric($id) || (int) $id <= 0) {
+                return ['status' => false, 'message' => __('messages.property_not_found'), 'data' => null];
+            }
+
+            $property = Property::withCount('floors')->with('creator:id,name', 'branch:id,name')->find((int) $id);
+
+            if (!$property) {
+                return ['status' => false, 'message' => __('messages.property_not_found'), 'data' => null];
+            }
+
+            return ['status' => true, 'message' => __('messages.property_fetched'), 'data' => $property];
+        } catch (\Exception $e) {
+            Log::error('PropertyRepository show error', ['id' => $id, 'error' => $e->getMessage()]);
+            return ['status' => false, 'message' => __('messages.operation_failed'), 'data' => null];
+        }
+    }
+
+    public function store($request)
+    {
+        DB::beginTransaction();
+
+        try {
+            $branchId = $request->has('branch_id') && $request->branch_id
+                ? (int) $request->branch_id
+                : $request->attributes->get('selected_branch_id');
+
+            $allowedBranchIds = $request->attributes->get('allowed_branch_ids');
+            if ($branchId && is_array($allowedBranchIds) && !in_array((int) $branchId, $allowedBranchIds, true)) {
+                DB::rollBack();
+                return ['status' => false, 'message' => 'ليس لديك صلاحية لإضافة عقار لهذا الفرع', 'data' => null];
+            }
+
+            $property = Property::create([
+                'name'       => $request->name,
+                'name_en'    => $request->name_en,
+                'address'    => $request->address,
+                'city'       => $request->city,
+                'phone'      => $request->phone,
+                'email'      => $request->email,
+                'notes'      => $request->notes,
+                'is_active'  => $request->is_active ?? true,
+                'branch_id'  => $branchId ? (int) $branchId : null,
+                'created_by' => auth()->id(),
+            ]);
+
+            ActivityLog::log('CREATE', __('messages.property_created') . ': ' . $property->name, $property);
+
+            DB::commit();
+
+            return ['status' => true, 'message' => __('messages.property_created'), 'data' => $property->load('creator:id,name')];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('PropertyRepository store error', ['error' => $e->getMessage()]);
+            return ['status' => false, 'message' => __('messages.operation_failed'), 'data' => null];
+        }
+    }
+
+    public function update($request, $property)
+    {
+        DB::beginTransaction();
+
+        try {
+            $oldValues = $property->toArray();
+
+            $allowedFields = ['name', 'name_en', 'address', 'city', 'phone', 'email', 'notes', 'is_active', 'branch_id'];
+
+            $updateData = [];
+            foreach ($allowedFields as $field) {
+                if ($request->has($field)) {
+                    $updateData[$field] = $request->$field;
+                }
+            }
+
+            if (isset($updateData['is_active'])) {
+                $updateData['is_active'] = (bool) $updateData['is_active'];
+            }
+
+            if (array_key_exists('branch_id', $updateData)) {
+                $newBranchId = $updateData['branch_id'] ? (int) $updateData['branch_id'] : null;
+                $allowedBranchIds = $request->attributes->get('allowed_branch_ids');
+
+                if ($newBranchId && is_array($allowedBranchIds) && !in_array($newBranchId, $allowedBranchIds, true)) {
+                    DB::rollBack();
+                    return ['status' => false, 'message' => 'ليس لديك صلاحية لنقل العقار لهذا الفرع', 'data' => null];
+                }
+
+                $updateData['branch_id'] = $newBranchId;
+            }
+
+            $property->update($updateData);
+
+            ActivityLog::log('UPDATE', __('messages.property_updated') . ': ' . $property->name, $property, $oldValues, $property->fresh()->toArray());
+
+            DB::commit();
+
+            return ['status' => true, 'message' => __('messages.property_updated'), 'data' => $property->fresh()->load('creator:id,name')];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('PropertyRepository update error', ['error' => $e->getMessage()]);
+            return ['status' => false, 'message' => __('messages.operation_failed'), 'data' => null];
+        }
+    }
+
+    public function destroy($property)
+    {
+        DB::beginTransaction();
+
+        try {
+            $property->loadCount('floors');
+
+            if ($property->floors_count > 0) {
+                DB::rollBack();
+                return ['status' => false, 'message' => __('messages.property_has_floors'), 'data' => null];
+            }
+
+            $propertyName = $property->name;
+            $propertyId   = $property->id;
+
+            ActivityLog::log('DELETE', __('messages.property_deleted') . ': ' . $propertyName, $property);
+            $property->delete();
+
+            DB::commit();
+
+            return ['status' => true, 'message' => __('messages.property_deleted'), 'data' => ['id' => $propertyId]];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('PropertyRepository destroy error', ['error' => $e->getMessage()]);
+            return ['status' => false, 'message' => __('messages.operation_failed'), 'data' => null];
+        }
+    }
+}
