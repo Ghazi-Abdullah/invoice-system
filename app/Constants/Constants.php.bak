@@ -111,7 +111,7 @@ class Constants
 
     // System Settings
     const SYSTEM_NAME_EN = 'Invoice System';
-    const SYSTEM_NAME_AR = 'نظام الفواتير';
+    const SYSTEM_NAME_AR = 'Ù†Ø¸Ø§Ù… Ø§Ù„ÙÙˆØ§ØªÙŠØ±';
     const SYSTEM_VERSION = '1.0.0';
 
     // Notification Types
@@ -132,7 +132,7 @@ class Constants
     const EXPORT_CSV = 'csv';
     const CACHE_TTL_INVOICES = 600; // 10 minutes
 
-    // Payment Statuses (بجانب Invoice Statuses)
+    // Payment Statuses (Ø¨Ø¬Ø§Ù†Ø¨ Invoice Statuses)
     const PAYMENT_STATUS_PENDING = 'pending';
     const PAYMENT_STATUS_COMPLETED = 'completed';
     const PAYMENT_STATUS_FAILED = 'failed';
@@ -143,7 +143,7 @@ class Constants
     const PAYMENT_METHOD_BANK_TRANSFER = 'bank_transfer';
     const PAYMENT_METHOD_CASH = 'cash';
 
-    // Permissions (بجانب الصلاحيات الحالية)
+    // Permissions (Ø¨Ø¬Ø§Ù†Ø¨ Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ§Øª Ø§Ù„Ø­Ø§Ù„ÙŠØ©)
     const CREATE_PAYMENT = 'create_payment';
     const VIEW_PAYMENTS = 'view_payments';
     const REFUND_PAYMENT = 'refund_payment';
@@ -154,7 +154,7 @@ class Constants
     const DELETE_SUPPORT_TICKET = 'delete_support_ticket';
     const REFUND_PAYMENTS = 'refund_payments';
 
-    // Response Messages (أضف في قسم messages)
+    // Response Messages (Ø£Ø¶Ù ÙÙŠ Ù‚Ø³Ù… messages)
     const MESSAGE_PAYMENT_SESSION_CREATED = 'payment_session_created';
     const MESSAGE_PAYMENT_SUCCESS = 'payment_success';
     const MESSAGE_PAYMENT_FAILED = 'payment_failed';
@@ -163,27 +163,4 @@ class Constants
 
     const INVOICE_STATUS_UNPAID = 'unpaid';
     const INVOICE_STATUS_PENDING = 'pending';
-
-    // ═══════════════════════════════════════════════════════════════
-    // Property & Facility Management Module
-    // ═══════════════════════════════════════════════════════════════
-    const VIEW_PROPERTIES = 'view_properties';
-    const CREATE_PROPERTY = 'create_property';
-    const EDIT_PROPERTY = 'edit_property';
-    const DELETE_PROPERTY = 'delete_property';
-
-    const VIEW_FLOORS = 'view_floors';
-    const CREATE_FLOOR = 'create_floor';
-    const EDIT_FLOOR = 'edit_floor';
-    const DELETE_FLOOR = 'delete_floor';
-
-    const VIEW_UNITS = 'view_units';
-    const CREATE_UNIT = 'create_unit';
-    const EDIT_UNIT = 'edit_unit';
-    const DELETE_UNIT = 'delete_unit';
-
-    const VIEW_TENANTS = 'view_tenants';
-    const CREATE_TENANT = 'create_tenant';
-    const EDIT_TENANT = 'edit_tenant';
-    const DELETE_TENANT = 'delete_tenant';
 }
